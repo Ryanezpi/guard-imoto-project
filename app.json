@@ -11,7 +11,12 @@
     "ios": {
       "supportsTablet": true
     },
-    "android": {
+    "splash": {
+        "image": "./assets/images/android-icon-background.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff"
+      },
+  "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -38,7 +43,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
