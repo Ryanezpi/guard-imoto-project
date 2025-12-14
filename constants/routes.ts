@@ -36,15 +36,24 @@ export const ROUTES = {
     ALERT_DETAIL: '/(app)/alerts/[id]', // Dynamic alert detail
     SETTINGS: '/(app)/settings', // Settings screen
   },
-
+  MAP: {
+    ROOT: '/(app)/map',
+    INDEX: '/(app)/map/index',
+    DEVICES: '/(app)/map/devices',
+    DEVICE_SETTINGS: '/(app)/map/device-settings',
+    DEVICE: {
+      BATTERY: '/(app)/map/device/battery',
+      NFC: '/(app)/map/device/nfc',
+      ALARM_TYPE: '/(app)/map/device/alarm-type',
+    },
+  },
   PROFILE: {
     ROOT: '/(app)/profile',
-    INDEX: '/(app)/profile/index', // Profile main screen
     DEVICES: '/(app)/profile/devices',
     EDIT: '/(app)/profile/edit',
+    LOGS: '/(app)/profile/logs',
     NOTIFICATIONS: '/(app)/profile/notifications',
     HELP: '/(app)/profile/help',
     SECURITY: '/(app)/profile/security',
-    HISTORY: '/(app)/profile/history', // Profile history
   },
 } as const;

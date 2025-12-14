@@ -4,5 +4,13 @@
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
   },
-  "cSpell.words": ["gearshape", "guardimotoproject", "imoto", "RFID"]
+  "cSpell.words": [
+    "gearshape",
+    "guardimotoproject",
+    "imoto",
+    "Moto",
+    "qrcode",
+    "RFID",
+    "unpair"
+  ]
 }

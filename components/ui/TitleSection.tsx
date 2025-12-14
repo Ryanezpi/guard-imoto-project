@@ -4,24 +4,26 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useTheme } from '@/context/ThemeContext';
 
 interface TitleSectionProps {
-  title: string; // The main header/title
-  helperEnabled?: boolean; // Show helper icon
-  helperValue?: string; // Helper value shown when ? is pressed or inline
-  children: React.ReactNode; // Content wrapped below the header
-  onHelperPress?: () => void; // Optional press action for helper
+  title: string;
+  subtitle?: string; // 👈 NEW
+  helperEnabled?: boolean;
+  helperValue?: string;
+  children: React.ReactNode;
+  onHelperPress?: () => void;
 }
 
-// TitleSection.tsx
 export default function TitleSection({
   title,
+  subtitle,
   helperEnabled = false,
   helperValue,
   onHelperPress,
   children,
 }: TitleSectionProps) {
-  const { theme } = useTheme(); // using theme ensures re-render on theme change
+  const { theme } = useTheme();
 
   const titleColor = theme === 'light' ? '#000' : '#fff';
+  const subtitleColor = theme === 'light' ? '#666' : '#aaa';
   const helperColor = theme === 'light' ? '#666' : '#aaa';
 
   return (
@@ -30,12 +32,36 @@ export default function TitleSection({
         style={{
           flexDirection: 'row',
           justifyContent: 'space-between',
+          alignItems: 'flex-start',
           marginBottom: 8,
         }}
       >
-        <Text style={{ fontSize: 16, fontWeight: 'bold', color: titleColor }}>
-          {title}
-        </Text>
+        {/* Title + Subtitle */}
+        <View style={{ flexShrink: 1 }}>
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: 'bold',
+              color: titleColor,
+            }}
+          >
+            {title}
+          </Text>
+
+          {subtitle && (
+            <Text
+              style={{
+                marginTop: 2,
+                fontSize: 13,
+                color: subtitleColor,
+              }}
+            >
+              {subtitle}
+            </Text>
+          )}
+        </View>
+
+        {/* Helper */}
         {helperEnabled && (
           <TouchableOpacity
             onPress={onHelperPress}
@@ -43,7 +69,13 @@ export default function TitleSection({
           >
             <FontAwesome name="question-circle" size={16} color={helperColor} />
             {helperValue && (
-              <Text style={{ marginLeft: 6, fontSize: 14, color: helperColor }}>
+              <Text
+                style={{
+                  marginLeft: 6,
+                  fontSize: 14,
+                  color: helperColor,
+                }}
+              >
                 {helperValue}
               </Text>
             )}
@@ -51,7 +83,7 @@ export default function TitleSection({
         )}
       </View>
 
-      {/* Wrap children in a View with a key based on theme to force re-render */}
+      {/* Content */}
       <View key={theme}>{children}</View>
     </View>
   );

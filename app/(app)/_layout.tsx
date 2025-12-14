@@ -4,6 +4,7 @@ import React from 'react';
 import { Text } from 'react-native';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import NavButton from '@/components/ui/NavButton';
+import { HeaderEditButton } from '@/components/ui/HeaderEditButton';
 
 function LayoutContent() {
   const { theme } = useTheme();
@@ -30,14 +31,21 @@ function LayoutContent() {
           ),
 
           headerLeft: () => (
-            <NavButton route={ROUTES.APP.SETTINGS} iconName="bars" color={iconColor} />
+            <NavButton
+              route={ROUTES.APP.SETTINGS}
+              iconName="bars"
+              color={iconColor}
+            />
           ),
           headerRight: () => (
-            <NavButton route={ROUTES.PROFILE.NOTIFICATIONS} iconName="bell" color={iconColor} />
+            <NavButton
+              route={ROUTES.PROFILE.NOTIFICATIONS}
+              iconName="bell"
+              color={iconColor}
+            />
           ),
         }}
       />
-
       <Stack.Screen
         name="settings/index"
         options={{
@@ -45,6 +53,134 @@ function LayoutContent() {
           headerTitle: 'Menu',
           headerTitleAlign: 'center',
           headerTintColor: iconColor, // back button color
+          headerLeft: () => (
+            <NavButton route="back" iconName="arrow-left" color={titleColor} />
+          ),
+        }}
+      />
+
+      <Stack.Screen
+        name="profile/edit"
+        options={{
+          headerStyle: { backgroundColor: headerBg },
+          headerTitleAlign: 'center',
+          headerTitle: () => (
+            <Text
+              style={{ fontSize: 18, fontWeight: '600', color: titleColor }}
+            >
+              Profile
+            </Text>
+          ),
+          headerLeft: () => (
+            <NavButton route="back" iconName="arrow-left" color={titleColor} />
+          ),
+          headerRight: () => <HeaderEditButton />,
+        }}
+      />
+      <Stack.Screen
+        name="profile/notifications"
+        options={{
+          headerStyle: { backgroundColor: headerBg },
+          headerTitle: 'Notifications',
+          headerTitleAlign: 'center',
+          headerTintColor: iconColor, // back button color
+          headerLeft: () => (
+            <NavButton route="back" iconName="arrow-left" color={titleColor} />
+          ),
+        }}
+      />
+      <Stack.Screen
+        name="map/devices"
+        options={{
+          headerStyle: { backgroundColor: headerBg },
+          headerTitle: 'Devices',
+          headerTitleAlign: 'center',
+          headerTintColor: iconColor, // back button color
+          headerLeft: () => (
+            <NavButton route="back" iconName="arrow-left" color={titleColor} />
+          ),
+        }}
+      />
+      <Stack.Screen
+        name="map/device-settings"
+        options={{
+          headerStyle: { backgroundColor: headerBg },
+          headerTitle: 'Device Settings',
+          headerTitleAlign: 'center',
+          headerTintColor: iconColor, // back button color
+          headerLeft: () => (
+            <NavButton route="back" iconName="arrow-left" color={titleColor} />
+          ),
+        }}
+      />
+      <Stack.Screen
+        name="map/device/battery"
+        options={{
+          headerStyle: { backgroundColor: headerBg },
+          headerTitle: 'Battery Configuration',
+          headerTitleAlign: 'center',
+          headerTintColor: iconColor, // back button color
+          headerLeft: () => (
+            <NavButton route="back" iconName="arrow-left" color={titleColor} />
+          ),
+        }}
+      />
+      <Stack.Screen
+        name="map/device/nfc"
+        options={{
+          headerStyle: { backgroundColor: headerBg },
+          headerTitle: 'NFC Configuration',
+          headerTitleAlign: 'center',
+          headerTintColor: iconColor, // back button color
+          headerLeft: () => (
+            <NavButton route="back" iconName="arrow-left" color={titleColor} />
+          ),
+        }}
+      />
+      <Stack.Screen
+        name="map/device/alarm-type"
+        options={{
+          headerStyle: { backgroundColor: headerBg },
+          headerTitle: 'Alarm Type',
+          headerTitleAlign: 'center',
+          headerTintColor: iconColor, // back button color
+          headerLeft: () => (
+            <NavButton route="back" iconName="arrow-left" color={titleColor} />
+          ),
+        }}
+      />
+      <Stack.Screen
+        name="profile/devices"
+        options={{
+          headerStyle: { backgroundColor: headerBg },
+          headerTitleAlign: 'center',
+          headerTitle: () => (
+            <Text
+              style={{ fontSize: 18, fontWeight: '600', color: titleColor }}
+            >
+              Device Details
+            </Text>
+          ),
+          headerLeft: () => (
+            <NavButton route="back" iconName="arrow-left" color={titleColor} />
+          ),
+        }}
+      />
+      <Stack.Screen
+        name="profile/logs"
+        options={{
+          headerStyle: { backgroundColor: headerBg },
+          headerTitleAlign: 'center',
+          headerTitle: () => (
+            <Text
+              style={{ fontSize: 18, fontWeight: '600', color: titleColor }}
+            >
+              Audit Logs
+            </Text>
+          ),
+          headerLeft: () => (
+            <NavButton route="back" iconName="arrow-left" color={titleColor} />
+          ),
         }}
       />
     </Stack>

@@ -34,7 +34,8 @@ export default function SettingsScreen() {
           <DynamicCard
             name="Profile"
             prefixIcon="user"
-            onPress={() => console.log('Navigate to Profile')}
+            suffixIcon="chevron-right"
+            onPress={() => router.navigate(ROUTES.PROFILE.EDIT)}
           />
         </TitleSection>
 
@@ -42,6 +43,7 @@ export default function SettingsScreen() {
           <DynamicCard
             name="Push Notifications"
             prefixIcon="bell"
+            suffixIcon="chevron-right"
             toggle
             toggleValue={pushNotificationsEnabled}
             onToggle={setPushNotificationsEnabled}
@@ -52,6 +54,7 @@ export default function SettingsScreen() {
           <DynamicCard
             name={theme === 'light' ? 'Light Mode' : 'Dark Mode'}
             prefixIcon={theme === 'light' ? 'sun-o' : 'moon-o'}
+            suffixIcon="chevron-right"
             toggle
             toggleValue={theme === 'light'}
             onToggle={toggleTheme}
@@ -62,7 +65,8 @@ export default function SettingsScreen() {
           <DynamicCard
             name="Audit Logs"
             prefixIcon="file-text"
-            onPress={() => console.log('Navigate to Audit Logs')}
+            suffixIcon="chevron-right"
+            onPress={() => router.navigate(ROUTES.PROFILE.LOGS)}
           />
         </TitleSection>
       </ScrollView>
@@ -92,6 +96,6 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   logoutContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 16, // safe area padding
+    paddingBottom: 16,
   },
 });

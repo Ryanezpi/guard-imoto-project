@@ -1,10 +1,10 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
-import { ROUTES } from '@/constants/routes';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '@/context/ThemeContext';
 import DynamicCard from '@/components/ui/Card';
+import { ROUTES } from '@/constants/routes';
+import { useTheme } from '@/context/ThemeContext';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function MapDashboard() {
   const router = useRouter();
@@ -38,18 +38,10 @@ export default function MapDashboard() {
           key={theme + 'devices'}
           name="Devices"
           subText={3}
-          subTextBold={false}
+          nameTextBold={true}
           prefixIcon="server"
-          onPress={() => router.push(ROUTES.PROFILE.DEVICES)}
-        />
-
-        <DynamicCard
-          key={theme + 'history'}
-          name="History"
-          subText={'View your RFID activity log'}
-          prefixIcon="history"
-          subTextBold={false}
-          onPress={() => router.push(ROUTES.PROFILE.HISTORY)}
+          suffixIcon="chevron-right"
+          onPress={() => router.navigate(ROUTES.MAP.DEVICES)}
         />
       </SafeAreaView>
     </View>

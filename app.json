@@ -9,14 +9,15 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kenshibu.guard-imoto-project"
     },
     "splash": {
-        "image": "./assets/images/android-icon-background.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#ffffff"
-      },
-  "android": {
+      "image": "./assets/images/android-icon-background.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

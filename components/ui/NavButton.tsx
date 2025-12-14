@@ -8,18 +8,31 @@ export default function NavButton({
   iconName,
   color,
 }: {
-  route: string | any;
+  route: 'back' | Parameters<typeof router.push>[0] | { action: () => void };
   iconName: keyof typeof FontAwesome.glyphMap;
   color: string;
 }) {
   const [loading, setLoading] = useState(false);
 
   const handlePress = () => {
-    if (loading) return; // ignore repeated taps
+    // Only execute navigation if not currently loading/navigating
+    if (loading) return;
     setLoading(true);
-    router.push(route);
-    // optionally, reset loading after a small delay
-    setTimeout(() => setLoading(false), 1000);
+
+    if (typeof route === 'string') {
+      if (route === 'back') {
+        router.back();
+      } else {
+        router.push(route);
+      }
+    } else if ('action' in route && typeof route.action === 'function') {
+      route.action();
+    }
+
+    // Set loading to false *after* a very small delay (100ms)
+    // to prevent immediate double-tap, but let the navigation
+    // stack handle the main transition.
+    setTimeout(() => setLoading(false), 100);
   };
 
   return (
@@ -36,10 +49,9 @@ export default function NavButton({
 
 const styles = StyleSheet.create({
   iconContainer: {
-    height: '100%',
-    padding: 16,
-    borderRadius: 24,
+    width: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 20,
   },
 });
