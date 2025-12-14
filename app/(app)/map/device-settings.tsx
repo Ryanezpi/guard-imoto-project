@@ -193,7 +193,7 @@ export default function DeviceSettingsScreen() {
             name={device.name}
             nameTextBold
             subText={device.enabled ? 'Enabled' : 'Disabled'}
-            subTextColor={device.enabled ? '#2fa500ff' : '#999'}
+            subTextColor={device.enabled ? '#2fa500ff' : '#ff3b30ff'}
             prefixElement={<DevicePrefix color={device.color} />}
             suffixIcon="edit"
             onPress={openEditModal}

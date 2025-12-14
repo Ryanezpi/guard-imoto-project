@@ -21,7 +21,11 @@ export default function NotificationsScreen() {
       onPress: () =>
         router.navigate({
           pathname: '/profile/devices',
-          params: { deviceId: 'DEV-123456' },
+          params: {
+            deviceId: 'DEV-123456',
+            deviceEnabled: 'true',
+            prefixColor: '#E53935',
+          },
         }),
     },
     {
@@ -34,7 +38,11 @@ export default function NotificationsScreen() {
       onPress: () =>
         router.navigate({
           pathname: '/profile/devices',
-          params: { deviceId: 'DEV-123456' },
+          params: {
+            deviceId: 'DEV-123456',
+            prefixColor: '#E53935',
+            deviceEnabled: 'true',
+          },
         }),
     },
     {
@@ -48,7 +56,11 @@ export default function NotificationsScreen() {
       onPress: () =>
         router.navigate({
           pathname: '/profile/devices',
-          params: { deviceId: 'DEV-123456' },
+          params: {
+            deviceId: 'DEV-123456',
+            prefixColor: '#E53935',
+            deviceEnabled: 'true',
+          },
         }),
     },
   ];

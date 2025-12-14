@@ -1,7 +1,7 @@
 import { Text } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import DynamicList, { DynamicListItem } from '@/components/ui/DynamicList';
-import { useGlobalSearchParams } from 'expo-router';
+import { router, useGlobalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DevicePrefix from '@/components/ui/DevicePrefix';
 
@@ -16,9 +16,19 @@ export default function DevicesScreen() {
     {
       id: 'header',
       name: deviceId,
+      subText: params.deviceEnabled ? 'Enabled' : 'Disabled',
+      subTextColor: params.deviceEnabled ? '#2fa500ff' : '#ff3b30ff',
       prefixElement: <DevicePrefix color={params.prefixColor ?? '#000'} />,
-      suffixIcon: 'cog',
-      onPress: () => {},
+      suffixIcon: 'chevron-right',
+      onPress: () => {
+        router.navigate({
+          pathname: '/map/device-settings',
+          params: {
+            deviceId: deviceId,
+            prefixColor: params.prefixColor ?? '#000',
+          },
+        });
+      },
     },
     {
       id: '2header',

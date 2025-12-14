@@ -207,7 +207,6 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 8,
     minHeight: 72,
-    alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 6,
     elevation: 1,
