@@ -5,6 +5,8 @@
     "source.sortMembers": "explicit"
   },
   "cSpell.words": [
+    "firebaseapp",
+    "firebasestorage",
     "gearshape",
     "guardimotoproject",
     "hdpi",
@@ -12,6 +14,8 @@
     "Moto",
     "qrcode",
     "RFID",
-    "unpair"
+    "SVSS",
+    "unpair",
+    "unsub"
   ]
 }

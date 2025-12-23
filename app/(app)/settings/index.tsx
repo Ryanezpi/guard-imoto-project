@@ -7,6 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ROUTES } from '@/constants/routes';
 import { router } from 'expo-router';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 export const screenOptions = {
   headerTitle: 'Menu',
@@ -80,8 +82,17 @@ export default function SettingsScreen() {
           prefixColor="#ff4d4f"
           onPress={async () => {
             try {
-              await AsyncStorage.clear();
-              // Navigate back to login
+              // 1. Firebase logout (THIS is critical)
+              await signOut(auth);
+
+              // 2. Optional: clear app-specific storage (not everything)
+              await AsyncStorage.multiRemove([
+                'theme',
+                'onboardingSeen',
+                // add only what YOU own
+              ]);
+
+              // 3. Route back to login
               router.replace(ROUTES.AUTH.LOGIN);
             } catch (err) {
               console.error('Logout failed', err);

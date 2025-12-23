@@ -1,8 +1,189 @@
-import { View, Text } from 'react-native';
+import {
+  View,
+  TextInput,
+  Pressable,
+  Text,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState } from 'react';
+import { useTheme } from '@/context/ThemeContext';
+import { auth } from '@/lib/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { useRouter } from 'expo-router';
+
 export default function ForgotPassword() {
+  const { theme } = useTheme();
+  const router = useRouter();
+
+  const [email, setEmail] = useState('');
+  const [sending, setSending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+
+  const bgColor = theme === 'light' ? '#ffffff' : '#272727';
+  const cardColor = theme === 'light' ? '#ffffff' : '#1f1f1f';
+  const textColor = theme === 'light' ? '#111827' : '#f9fafb';
+  const subTextColor = theme === 'light' ? '#6b7280' : '#9ca3af';
+  const borderColor = theme === 'light' ? '#d1d5db' : '#3f3f46';
+
+  const submit = async () => {
+    if (!email.trim()) {
+      setErrorMessage('Please enter your email.');
+      return;
+    }
+
+    setSending(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setSuccessMessage(
+        `Password reset email sent to ${email.trim()}. Check your inbox.`
+      );
+      setSent(true);
+    } catch (err: any) {
+      console.error('Failed to send reset email:', err);
+      setErrorMessage(
+        'Failed to send reset email. Check your email and try again.'
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text>Forgot Password</Text>
-    </View>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1, justifyContent: 'center' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={[styles.card, { backgroundColor: cardColor }]}>
+          <Text style={[styles.title, { color: textColor }]}>
+            Forgot Password
+          </Text>
+          <Text style={[styles.subtitle, { color: subTextColor }]}>
+            Enter your email address and we will send you a password reset link.
+          </Text>
+
+          {!sent && (
+            <TextInput
+              style={[styles.input, { borderColor, color: textColor }]}
+              placeholder="Email address"
+              placeholderTextColor={subTextColor}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={email}
+              onChangeText={setEmail}
+            />
+          )}
+
+          {errorMessage && (
+            <Text style={{ color: 'red', marginBottom: 8 }}>
+              {errorMessage}
+            </Text>
+          )}
+          {successMessage && (
+            <Text style={{ color: 'green', marginBottom: 8 }}>
+              {successMessage}
+            </Text>
+          )}
+
+          {!sent && (
+            <Pressable
+              style={[styles.primaryButton, sending && styles.buttonPressed]}
+              disabled={sending}
+              onPress={submit}
+            >
+              <Text style={styles.primaryButtonText}>
+                {sending ? 'Sending…' : 'Reset Password'}
+              </Text>
+            </Pressable>
+          )}
+
+          {sent && (
+            <Pressable
+              style={[styles.primaryButton, { marginTop: 12 }]}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.primaryButtonText}>Go Back</Text>
+            </Pressable>
+          )}
+
+          <Pressable
+            style={[
+              styles.primaryButton,
+              {
+                marginTop: sent ? 12 : 16,
+                borderWidth: 1,
+                borderColor,
+                backgroundColor: 'transparent',
+              },
+            ]}
+            onPress={() => router.back()}
+          >
+            <Text style={[styles.primaryButtonText, { color: textColor }]}>
+              Cancel
+            </Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
+
+  card: {
+    flex: 1,
+    marginHorizontal: 20,
+    borderRadius: 20,
+    padding: 24,
+  },
+
+  title: {
+    fontSize: 26,
+    fontWeight: '700',
+  },
+
+  subtitle: {
+    fontSize: 15,
+    marginTop: 4,
+    marginBottom: 28,
+  },
+
+  input: {
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    fontSize: 16,
+    marginBottom: 16,
+  },
+
+  primaryButton: {
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  primaryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  buttonPressed: {
+    opacity: 0.7,
+  },
+});

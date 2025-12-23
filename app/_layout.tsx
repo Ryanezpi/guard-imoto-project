@@ -1,93 +1,122 @@
+// RootLayout.tsx
 import { Slot, useRouter, useSegments } from 'expo-router';
-import { useEffect, useState, useRef } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ROUTES } from '@/constants/routes';
 import { OnboardingProvider } from '@/context/OnboardingContext';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { useAuth } from '@/hooks/useAuth';
+import { LoaderProvider } from '@/context/LoaderContext';
 
-// Mock Auth hook
-const useAuth = () => {
-  const user = null; // set {id:'123'} to test logged-in
-  const isLoading = false;
-  return { user, isLoading };
-};
+interface AuthUser {
+  uid: string;
+  email?: string;
+  emailVerified: boolean;
+  providerData: { providerId: string }[];
+}
 
 export default function RootLayout() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 
-  const [mounted, setMounted] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(
     null
   );
+  const [loading, setLoading] = useState(true);
 
-  const hasRedirected = useRef(false);
+  const typedUser = user as AuthUser | null;
 
-  // Load onboarding state
+  const isAuthenticated = !!user;
+  const isEmailVerified = typedUser?.emailVerified ?? false;
+
+  // ---- LOAD ONBOARDING FLAG ----
   useEffect(() => {
-    const loadOnboarding = async () => {
+    let mounted = true;
+
+    (async () => {
       try {
         const value = await AsyncStorage.getItem('@onboarding_complete');
-        setOnboardingComplete(value === 'true');
+        if (mounted) setOnboardingComplete(value === 'true');
       } catch (e) {
         console.error('Failed to read onboarding state', e);
-        setOnboardingComplete(false);
+        if (mounted) setOnboardingComplete(false);
+      } finally {
+        if (mounted) setLoading(false);
       }
+    })();
+
+    return () => {
+      mounted = false;
     };
-    loadOnboarding();
-    setMounted(true);
   }, []);
 
+  // ---- GLOBAL ROUTING GUARD ----
   useEffect(() => {
-    if (
-      !mounted ||
-      isLoading ||
-      onboardingComplete === null ||
-      hasRedirected.current
-    )
-      return;
+    if (loading || authLoading || onboardingComplete === null) return;
 
     const firstSegment = segments[0];
 
-    if (user) {
-      // Logged-in → go to app tabs if not already there
-      if (firstSegment === '(auth)' || firstSegment === '(onboarding)') {
-        hasRedirected.current = true;
-        router.replace('/(app)/map'); // default app screen → map tab
-      }
-    } else {
-      // Not logged-in
+    if (!isAuthenticated) {
       if (!onboardingComplete) {
-        if (firstSegment !== '(onboarding)') {
-          hasRedirected.current = true;
+        if (firstSegment !== '(onboarding)')
           router.replace(ROUTES.ONBOARDING.WALKTHROUGH);
-        }
-      } else {
-        // Onboarding complete → must go to login
-        if (firstSegment !== '(auth)') {
-          hasRedirected.current = true;
-          router.replace(ROUTES.AUTH.LOGIN);
-        }
+        return;
       }
+      if (firstSegment !== '(auth)') router.replace(ROUTES.AUTH.LOGIN);
+      return;
     }
-  }, [mounted, isLoading, onboardingComplete, user, segments, router]);
 
-  if (!mounted || isLoading || onboardingComplete === null) {
+    if (!isEmailVerified) {
+      if (firstSegment !== '(auth)')
+        router.replace('/(auth)/create-account/email-verification');
+      return;
+    }
+
+    if (firstSegment !== '(app)') router.replace('/(app)/map');
+  }, [
+    isAuthenticated,
+    isEmailVerified,
+    authLoading,
+    loading,
+    onboardingComplete,
+    segments,
+    router,
+  ]);
+
+  // ---- RENDER LOADER IF STILL LOADING ----
+  if (authLoading || loading || onboardingComplete === null) {
     return (
       <ThemeProvider>
         <OnboardingProvider>
-          <View
-            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-          >
-            <ActivityIndicator size="large" />
-            <Text>Loading App...</Text>
-          </View>
+          <LoaderProvider>
+            <View style={styles.loaderContainer}>
+              <ActivityIndicator size="large" color="#2563EB" />
+            </View>
+          </LoaderProvider>
         </OnboardingProvider>
       </ThemeProvider>
     );
   }
 
-  return <Slot />;
+  // ---- NORMAL RENDER ----
+  return (
+    <ThemeProvider>
+      <OnboardingProvider>
+        <LoaderProvider>
+          <Slot />
+        </LoaderProvider>
+      </OnboardingProvider>
+    </ThemeProvider>
+  );
 }
+
+const styles = StyleSheet.create({
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#00000033', // subtle transparent overlay
+  },
+});
