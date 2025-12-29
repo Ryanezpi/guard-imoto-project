@@ -19,7 +19,7 @@
       },
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyCNnec1m4ptsw7_aDP7ICCg4Qu46wdhUeY"
+          "apiKey": "process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY"
         }
       },
       "edgeToEdgeEnabled": true,
