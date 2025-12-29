@@ -5,6 +5,7 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useState, useEffect } from 'react';
 import { useTheme } from '@/context/ThemeContext';
+import { registerUserWithBackend } from '@/services/auth.service';
 
 export default function PasswordStep() {
   const params = useLocalSearchParams();
@@ -32,11 +33,13 @@ export default function PasswordStep() {
   }, [password, confirm]);
 
   const next = async () => {
-    router.push('/(auth)/create-account/email-verification');
+    router.push('/(guard)/(auth)/create-account/email-verification');
 
     if (!isValid) return;
 
     try {
+      setLoading(true);
+
       setLoading(true);
 
       const res = await createUserWithEmailAndPassword(
@@ -45,17 +48,13 @@ export default function PasswordStep() {
         password
       );
 
-      // Save user details to backend
-      // await fetch('https://your-api/users', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     uid: res.user.uid,
-      //     ...params,
-      //   }),
-      // });
+      await registerUserWithBackend(res.user, {
+        first_name: params.firstName as string,
+        last_name: params.lastName as string,
+        phone: params.phone as string,
+      });
 
-      router.push('/(auth)/create-account/email-verification');
+      router.push('/(guard)/(auth)/create-account/email-verification');
     } catch (e: any) {
       alert(e.message);
     } finally {

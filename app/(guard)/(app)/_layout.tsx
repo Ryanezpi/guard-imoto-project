@@ -1,7 +1,7 @@
 import { ROUTES } from '@/constants/routes';
 import { Stack } from 'expo-router';
 import React from 'react';
-import { Text } from 'react-native';
+import { Text, Image, StyleSheet } from 'react-native';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import NavButton from '@/components/ui/NavButton';
 import { HeaderEditButton } from '@/components/ui/HeaderEditButton';
@@ -26,7 +26,11 @@ function LayoutContent() {
             <Text
               style={{ fontSize: 18, fontWeight: 'bold', color: titleColor }}
             >
-              MyLogo
+              <Image
+                source={require('@/assets/icons/main-logo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
             </Text>
           ),
 
@@ -183,9 +187,32 @@ function LayoutContent() {
           ),
         }}
       />
+      <Stack.Screen
+        name="profile/audit-log-details"
+        options={{
+          headerStyle: { backgroundColor: headerBg },
+          headerTitleAlign: 'center',
+          headerTitle: () => (
+            <Text
+              style={{ fontSize: 18, fontWeight: '600', color: titleColor }}
+            >
+              Audit Log Details
+            </Text>
+          ),
+          headerLeft: () => (
+            <NavButton route="back" iconName="arrow-left" color={titleColor} />
+          ),
+        }}
+      />
     </Stack>
   );
 }
+const styles = StyleSheet.create({
+  logo: {
+    width: 64,
+    height: 64,
+  },
+});
 
 export default function AppLayout() {
   return (

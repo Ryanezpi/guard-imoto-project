@@ -1,39 +1,92 @@
-import React, { useState } from 'react';
-import { View, Text, Button, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Button, ScrollView, Alert } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import DynamicCard from '@/components/ui/Card';
 import TitleSection from '@/components/ui/TitleSection';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import HelperBox from '@/components/ui/HelperBoxProps';
 import Slider from '@react-native-community/slider';
+import { useAuth } from '@/context/AuthContext';
+import { useDevices } from '@/context/DeviceContext';
+import { patchDeviceConfig } from '@/services/user.service';
+import { useGlobalSearchParams } from 'expo-router';
 
-export default function DeviceBatterySettings({
-  deviceColor,
-  deviceId,
-}: {
-  deviceColor: string;
-  deviceId: string;
-}) {
+type BatteryState = {
+  battery_saver_enabled: boolean;
+  battery_saver_threshold: number;
+};
+
+export default function DeviceBatterySettings() {
   const { theme } = useTheme();
+  const { idToken } = useAuth();
+  const { devices, refreshDevices } = useDevices();
+  const params = useGlobalSearchParams() as Record<string, string | undefined>;
+  const deviceId = params.device_id;
+  const deviceColor = params.device_color || '#E53935';
+
   const bgColor = theme === 'light' ? '#f0f0f0' : '#272727';
 
-  const [autoBattery, setAutoBattery] = useState(false);
-  const [voltageLevel, setVoltageLevel] = useState(20); // default battery-saving threshold
-  const [tempVoltage, setTempVoltage] = useState(voltageLevel);
+  const [batteryState, setBatteryState] = useState<BatteryState>({
+    battery_saver_enabled: false,
+    battery_saver_threshold: 20,
+  });
+  const [tempThreshold, setTempThreshold] = useState(20);
   const [showActionButtons, setShowActionButtons] = useState(false);
 
+  // Initialize from devices context
+  useEffect(() => {
+    const apiDevice = devices.find((d) => d.device_id === deviceId);
+    if (!apiDevice) return;
+
+    setBatteryState({
+      battery_saver_enabled: !!apiDevice.battery_saver_enabled,
+      battery_saver_threshold: apiDevice.battery_saver_threshold ?? 20,
+    });
+    setTempThreshold(apiDevice.battery_saver_threshold ?? 20);
+  }, [devices, deviceId]);
+
+  const updateAndSync = async (
+    updater: (state: BatteryState) => BatteryState
+  ) => {
+    setBatteryState((prev) => {
+      if (!prev) return prev;
+      const next = updater(prev);
+
+      (async () => {
+        try {
+          await patchDeviceConfig(idToken!, deviceId!, {
+            battery_saver_enabled: next.battery_saver_enabled,
+            battery_saver_threshold: next.battery_saver_threshold,
+          });
+          await refreshDevices();
+        } catch (e: any) {
+          Alert.alert(
+            'Sync failed',
+            e.message || 'Could not update battery settings.'
+          );
+          setBatteryState(prev);
+        }
+      })();
+
+      return next;
+    });
+  };
+
   const handleSliderChange = (value: number) => {
-    setTempVoltage(value);
-    setShowActionButtons(value !== voltageLevel); // show save/cancel only if changed
+    setTempThreshold(value);
+    setShowActionButtons(value !== batteryState.battery_saver_threshold);
   };
 
   const handleSave = () => {
-    setVoltageLevel(tempVoltage);
+    updateAndSync((prev) => ({
+      ...prev,
+      battery_saver_threshold: tempThreshold,
+    }));
     setShowActionButtons(false);
   };
 
   const handleCancel = () => {
-    setTempVoltage(voltageLevel);
+    setTempThreshold(batteryState.battery_saver_threshold);
     setShowActionButtons(false);
   };
 
@@ -44,13 +97,17 @@ export default function DeviceBatterySettings({
     >
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         <TitleSection title="Battery Settings">
-          {/* Auto Battery Saving Toggle */}
           <DynamicCard
             name="Enable Auto Battery Saving"
             prefixIcon="battery-half"
             toggle
-            toggleValue={autoBattery}
-            onToggle={setAutoBattery}
+            toggleValue={batteryState.battery_saver_enabled}
+            onToggle={(v) =>
+              updateAndSync((prev) => ({
+                ...prev,
+                battery_saver_enabled: v,
+              }))
+            }
           />
 
           <HelperBox
@@ -62,8 +119,7 @@ export default function DeviceBatterySettings({
             }
           />
 
-          {/* Slider for Voltage Threshold */}
-          {autoBattery && (
+          {batteryState.battery_saver_enabled && (
             <View
               style={{
                 backgroundColor: theme === 'light' ? '#fff' : '#1f1f1f',
@@ -87,14 +143,14 @@ export default function DeviceBatterySettings({
                   color: theme === 'light' ? '#000' : '#fff',
                 }}
               >
-                Battery-saving Threshold: {tempVoltage}%
+                Battery-saving Threshold: {tempThreshold}%
               </Text>
 
               <Slider
                 minimumValue={10}
                 maximumValue={100}
                 step={1}
-                value={tempVoltage}
+                value={tempThreshold}
                 onValueChange={handleSliderChange}
                 minimumTrackTintColor={deviceColor}
                 maximumTrackTintColor="#ccc"

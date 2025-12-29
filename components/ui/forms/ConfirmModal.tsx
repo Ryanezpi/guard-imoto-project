@@ -1,6 +1,15 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity } from 'react-native';
+import {
+  Modal,
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Dimensions,
+} from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface ConfirmModalProps {
   visible: boolean;
@@ -39,31 +48,46 @@ export default function ConfirmModal({
         <View
           style={{
             width: '90%',
+            maxHeight: SCREEN_HEIGHT * 0.8, // 🔑 hard cap
             backgroundColor: bg,
             borderRadius: 12,
-            padding: 16,
+            overflow: 'hidden', // 🔑 prevents bleed
           }}
         >
+          {/* HEADER */}
           {title && (
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: '700',
-                marginBottom: 12,
-                color: text,
-              }}
-            >
-              {title}
-            </Text>
+            <View style={{ padding: 16, paddingBottom: 8 }}>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: '700',
+                  color: text,
+                }}
+              >
+                {title}
+              </Text>
+            </View>
           )}
 
-          {children}
+          {/* SCROLLABLE CONTENT */}
+          <ScrollView
+            contentContainerStyle={{
+              paddingHorizontal: 16,
+              paddingBottom: 12,
+            }}
+            showsVerticalScrollIndicator={false}
+          >
+            {children}
+          </ScrollView>
 
+          {/* FOOTER */}
           <View
             style={{
               flexDirection: 'row',
               justifyContent: 'flex-end',
-              marginTop: 16,
+              padding: 16,
+              borderTopWidth: 1,
+              borderTopColor: theme === 'light' ? '#eee' : '#333',
             }}
           >
             <TouchableOpacity onPress={onCancel}>

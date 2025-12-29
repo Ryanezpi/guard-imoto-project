@@ -4,9 +4,12 @@ import ConfirmModal from '@/components/ui/forms/ConfirmModal';
 import TitleSection from '@/components/ui/TitleSection';
 import { DEVICE_COLORS } from '@/constants/colors';
 import { ROUTES } from '@/constants/routes';
+import { useAuth } from '@/context/AuthContext';
+import { useDevices } from '@/context/DeviceContext';
 import { useTheme } from '@/context/ThemeContext';
+import { patchDeviceConfig } from '@/services/user.service';
 import { router, useGlobalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ScrollView,
   TextInput,
@@ -21,10 +24,12 @@ type DeviceState = {
   name: string;
   color: string;
   enabled: boolean;
+
   sensors: {
     gyroscope: boolean;
     gps: boolean;
   };
+
   alerts: {
     sms: boolean;
     vibration: boolean;
@@ -32,68 +37,244 @@ type DeviceState = {
     tremors: boolean;
     lowBattery: boolean;
   };
+
   relays: {
-    siren: boolean;
+    siren: {
+      enabled: boolean;
+      alarmType: 'continuous' | 'intermittent';
+      triggerMode: 'manual' | 'auto';
+      intervalSec: number | null;
+      delaySec: number | null;
+    };
+    relay1_override: boolean;
+
     ignition: boolean;
+    relay2_override: boolean;
   };
 };
 
+function mapApiDeviceToState(api: any): DeviceState {
+  return {
+    name: api.device_name ?? api.serial_number,
+    color: api.device_color ?? '#E53935',
+    enabled: api.paired,
+
+    sensors: {
+      gyroscope: api.gyroscope_enabled ?? false,
+      gps: api.gps_enabled ?? false,
+    },
+
+    alerts: {
+      sms: api.sms_alerts_enabled ?? false,
+      lowBattery: api.low_battery ?? false,
+      vibration: api.vibration ?? false,
+      movement: api.movement ?? false,
+      tremors: api.tremors ?? false,
+    },
+
+    relays: {
+      siren: {
+        enabled: api.relay1_enabled ?? false,
+        alarmType: api.relay1_alarm_type ?? 'continuous',
+        triggerMode: api.relay1_trigger_mode ?? 'auto',
+        intervalSec: api.relay1_interval_sec ?? null,
+        delaySec: api.relay1_delay_sec ?? null,
+      },
+      relay1_override: api.relay1_override ?? false,
+
+      ignition: api.relay2_enabled ?? false,
+      relay2_override: api.relay2_override ?? false,
+    },
+  };
+}
+
+function mapStateToPatchConfig(state: DeviceState) {
+  return {
+    device_name: state.name,
+    device_color: state.color,
+    paired: state.enabled,
+
+    // Sensors
+    gyroscope_enabled: state.sensors.gyroscope,
+    gps_enabled: state.sensors.gps,
+
+    // Relay 1 (Siren)
+    relay1_enabled: state.relays.siren.enabled,
+    relay1_override: state.relays.relay1_override,
+    relay1_alarm_type: state.relays.siren.enabled
+      ? state.relays.siren.alarmType
+      : null,
+    relay1_interval_sec: state.relays.siren.enabled
+      ? state.relays.siren.intervalSec
+      : null,
+    relay1_trigger_mode: state.relays.siren.enabled
+      ? state.relays.siren.triggerMode
+      : null,
+    relay1_delay_sec: state.relays.siren.enabled
+      ? state.relays.siren.delaySec
+      : null,
+
+    // Relay 2 (Ignition)
+    relay2_enabled: state.relays.ignition,
+    relay2_override: state.relays.relay2_override,
+
+    // Alerts
+    battery_saver_enabled: state.alerts.lowBattery,
+    battery_saver_threshold: state.alerts.lowBattery ? 20 : null,
+
+    sms_alerts_enabled: state.alerts.sms,
+    vibration: state.alerts.vibration,
+    movement: state.alerts.movement,
+    tremors: state.alerts.tremors,
+    low_battery: state.alerts.lowBattery,
+  };
+}
+
 export default function DeviceSettingsScreen() {
   const { theme } = useTheme();
+  const { idToken } = useAuth();
+  const { refreshDevices } = useDevices();
+
   const bgColor = theme === 'light' ? '#f0f0f0' : '#272727';
   const textColor = theme === 'light' ? '#000' : '#fff';
 
   const params = useGlobalSearchParams() as Record<string, string | undefined>;
-  const deviceId = params.deviceId ?? 'Unknown Device';
-  const deviceColor = params.prefixColor ?? '#4e8cff';
+  const deviceId = params.device_id;
 
-  const [device, setDevice] = useState<DeviceState>({
-    name: deviceId,
-    color: deviceColor,
-    enabled: true,
-    sensors: { gyroscope: false, gps: false },
-    alerts: {
-      sms: false,
-      vibration: false,
-      movement: false,
-      tremors: false,
-      lowBattery: false,
-    },
-    relays: { siren: false, ignition: false },
-  });
+  const { devices } = useDevices();
 
-  const [draft, setDraft] = useState(device);
+  const [device, setDevice] = useState<DeviceState | null>(null);
+  const [draft, setDraft] = useState<DeviceState | null>(null);
+
   const [showEditModal, setShowEditModal] = useState(false);
-  const sirenTimeoutRef = useRef<number | null>(null);
+
+  const updateDraft = (updater: (d: DeviceState) => DeviceState) => {
+    setDraft((prev) => (prev ? updater(prev) : prev));
+  };
 
   const openEditModal = () => {
-    setDraft(device);
+    setDraft(structuredClone(device));
     setShowEditModal(true);
   };
 
-  // Auto-off siren after 10s
-  useEffect(() => {
-    if (!device.relays.siren) {
-      if (sirenTimeoutRef.current) {
-        clearTimeout(sirenTimeoutRef.current);
-        sirenTimeoutRef.current = null;
-      }
-      return;
-    }
+  function diffPatch(
+    prev: DeviceState,
+    next: DeviceState
+  ): Record<string, any> {
+    const patch: Record<string, any> = {};
 
-    sirenTimeoutRef.current = setTimeout(() => {
-      setDevice((d) => ({ ...d, relays: { ...d.relays, siren: false } }));
-      sirenTimeoutRef.current = null;
-    }, 10_000);
-
-    return () => {
-      if (sirenTimeoutRef.current) {
-        clearTimeout(sirenTimeoutRef.current);
-        sirenTimeoutRef.current = null;
+    const addIfChanged = (key: string, a: any, b: any) => {
+      if (JSON.stringify(a) !== JSON.stringify(b)) {
+        patch[key] = b;
       }
     };
-  }, [device.relays.siren]);
 
+    // Sensors
+    addIfChanged(
+      'gyroscope_enabled',
+      prev.sensors.gyroscope,
+      next.sensors.gyroscope
+    );
+    addIfChanged('gps_enabled', prev.sensors.gps, next.sensors.gps);
+
+    // Alerts
+    addIfChanged('sms_alerts_enabled', prev.alerts.sms, next.alerts.sms);
+    addIfChanged(
+      'battery_saver_enabled',
+      prev.alerts.lowBattery,
+      next.alerts.lowBattery
+    );
+
+    // Relay 1
+    addIfChanged(
+      'relay1_enabled',
+      prev.relays.siren.enabled,
+      next.relays.siren.enabled
+    );
+    addIfChanged(
+      'relay1_override',
+      prev.relays.relay1_override,
+      next.relays.relay1_override
+    );
+
+    if (next.relays.siren.enabled) {
+      addIfChanged(
+        'relay1_alarm_type',
+        prev.relays.siren.alarmType,
+        next.relays.siren.alarmType
+      );
+      addIfChanged(
+        'relay1_interval_sec',
+        prev.relays.siren.intervalSec,
+        next.relays.siren.intervalSec
+      );
+      addIfChanged(
+        'relay1_trigger_mode',
+        prev.relays.siren.triggerMode,
+        next.relays.siren.triggerMode
+      );
+      addIfChanged(
+        'relay1_delay_sec',
+        prev.relays.siren.delaySec,
+        next.relays.siren.delaySec
+      );
+    }
+
+    // Relay 2
+    addIfChanged('relay2_enabled', prev.relays.ignition, next.relays.ignition);
+    addIfChanged(
+      'relay2_override',
+      prev.relays.relay2_override,
+      next.relays.relay2_override
+    );
+
+    return patch;
+  }
+
+  useEffect(() => {
+    if (!devices || !deviceId) return;
+
+    const apiDevice = devices.find((d) => d.device_id === deviceId);
+    if (!apiDevice) return;
+
+    const mapped = mapApiDeviceToState(apiDevice);
+    setDevice(mapped);
+    setDraft(mapped);
+  }, [devices, deviceId]);
+
+  const updateAndSync = (updater: (d: DeviceState) => DeviceState) => {
+    setDevice((prev) => {
+      if (!prev) return prev;
+
+      const snapshot = structuredClone(prev);
+      const next = updater(prev);
+
+      const patch = diffPatch(snapshot, next);
+      if (Object.keys(patch).length === 0) return next;
+
+      (async () => {
+        try {
+          await patchDeviceConfig(idToken!, deviceId!, patch);
+          await refreshDevices();
+        } catch (e: any) {
+          setDevice(snapshot);
+          Alert.alert('Sync failed', e.message);
+        }
+      })();
+
+      return next;
+    });
+  };
+
+  if (!device || !draft) {
+    return (
+      <SafeAreaView
+        style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+      >
+        <Text>Loading device…</Text>
+      </SafeAreaView>
+    );
+  }
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: bgColor }}
@@ -106,9 +287,19 @@ export default function DeviceSettingsScreen() {
           setDraft(device);
           setShowEditModal(false);
         }}
-        onConfirm={() => {
-          setDevice(draft);
-          setShowEditModal(false);
+        onConfirm={async () => {
+          try {
+            const payload = mapStateToPatchConfig(draft);
+            console.log(payload);
+
+            await patchDeviceConfig(idToken!, deviceId!, payload);
+            await refreshDevices();
+
+            setDevice(draft);
+            setShowEditModal(false);
+          } catch (e: any) {
+            Alert.alert('Update failed', e.message);
+          }
         }}
       >
         <Text
@@ -122,7 +313,7 @@ export default function DeviceSettingsScreen() {
         </Text>
         <TextInput
           value={draft.name}
-          onChangeText={(v) => setDraft((d) => ({ ...d, name: v }))}
+          onChangeText={(v) => updateDraft((d) => ({ ...d, name: v }))}
           style={{
             borderWidth: 1,
             borderColor: '#ccc',
@@ -132,7 +323,15 @@ export default function DeviceSettingsScreen() {
             color: theme === 'light' ? '#000' : '#fff',
           }}
         />
-
+        <Text
+          style={{
+            fontSize: 14,
+            marginBottom: 4,
+            color: theme === 'light' ? '#555' : '#aaa',
+          }}
+        >
+          Device Color
+        </Text>
         <View
           style={{
             flexDirection: 'row',
@@ -146,7 +345,7 @@ export default function DeviceSettingsScreen() {
             return (
               <TouchableOpacity
                 key={c}
-                onPress={() => setDraft((d) => ({ ...d, color: c }))}
+                onPress={() => updateDraft((d) => ({ ...d, color: c }))}
                 style={{
                   width: 36,
                   height: 36,
@@ -182,7 +381,7 @@ export default function DeviceSettingsScreen() {
           prefixIcon="power-off"
           toggle
           toggleValue={draft.enabled}
-          onToggle={(v) => setDraft((d) => ({ ...d, enabled: v }))}
+          onToggle={(v) => updateDraft((d) => ({ ...d, enabled: v }))}
         />
       </ConfirmModal>
 
@@ -204,7 +403,15 @@ export default function DeviceSettingsScreen() {
             prefixIcon="battery"
             subText="100%"
             suffixIcon="chevron-right"
-            onPress={() => router.navigate(ROUTES.MAP.DEVICE.BATTERY)}
+            onPress={() =>
+              router.navigate({
+                pathname: ROUTES.MAP.DEVICE.BATTERY,
+                params: {
+                  device_id: deviceId,
+                  device_color: device.color,
+                },
+              })
+            }
           />
 
           <DynamicCard
@@ -213,7 +420,7 @@ export default function DeviceSettingsScreen() {
             toggle
             toggleValue={device.sensors.gyroscope}
             onToggle={(v) =>
-              setDevice((d) => ({
+              updateAndSync((d) => ({
                 ...d,
                 sensors: { ...d.sensors, gyroscope: v },
               }))
@@ -226,7 +433,10 @@ export default function DeviceSettingsScreen() {
             toggle
             toggleValue={device.sensors.gps}
             onToggle={(v) =>
-              setDevice((d) => ({ ...d, sensors: { ...d.sensors, gps: v } }))
+              updateAndSync((d) => ({
+                ...d,
+                sensors: { ...d.sensors, gps: v },
+              }))
             }
           />
 
@@ -236,7 +446,7 @@ export default function DeviceSettingsScreen() {
             toggle
             toggleValue={device.alerts.sms}
             onToggle={(v) =>
-              setDevice((d) => ({ ...d, alerts: { ...d.alerts, sms: v } }))
+              updateAndSync((d) => ({ ...d, alerts: { ...d.alerts, sms: v } }))
             }
           />
 
@@ -244,9 +454,18 @@ export default function DeviceSettingsScreen() {
             name="Relay Channel 1 (Siren)"
             prefixIcon="bullhorn"
             toggle
-            toggleValue={device.relays.siren}
+            toggleValue={device.relays.siren.enabled}
             onToggle={(v) =>
-              setDevice((d) => ({ ...d, relays: { ...d.relays, siren: v } }))
+              updateAndSync((d) => ({
+                ...d,
+                relays: {
+                  ...d.relays,
+                  siren: {
+                    ...d.relays.siren,
+                    enabled: v,
+                  },
+                },
+              }))
             }
           />
 
@@ -256,7 +475,10 @@ export default function DeviceSettingsScreen() {
             toggle
             toggleValue={device.relays.ignition}
             onToggle={(v) =>
-              setDevice((d) => ({ ...d, relays: { ...d.relays, ignition: v } }))
+              updateAndSync((d) => ({
+                ...d,
+                relays: { ...d.relays, ignition: v },
+              }))
             }
           />
 
@@ -267,13 +489,15 @@ export default function DeviceSettingsScreen() {
             onPress={() =>
               router.navigate({
                 pathname: ROUTES.MAP.DEVICE.NFC,
-                params: { deviceId },
+                params: {
+                  device_id: deviceId,
+                  device_color: device.color,
+                },
               })
             }
           />
         </TitleSection>
 
-        {/* ALERTS */}
         <TitleSection
           title="Alerts"
           subtitle="Configure when and how you are notified."
@@ -303,7 +527,7 @@ export default function DeviceSettingsScreen() {
                 toggle
                 toggleValue={device.alerts[key]}
                 onToggle={(v) =>
-                  setDevice((d) => ({
+                  updateAndSync((d) => ({
                     ...d,
                     alerts: { ...d.alerts, [key]: v },
                   }))
@@ -322,9 +546,12 @@ export default function DeviceSettingsScreen() {
             name="Test Siren Relay"
             prefixIcon="bullhorn"
             toggle
-            toggleValue={device.relays.siren}
+            toggleValue={device.relays.relay1_override}
             onToggle={async (v) => {
-              setDevice((d) => ({ ...d, relays: { ...d.relays, siren: v } }));
+              updateAndSync((d) => ({
+                ...d,
+                relays: { ...d.relays, relay1_override: v },
+              }));
               try {
                 if (v) {
                   // await testRelay(deviceId, 'siren_on');
@@ -333,9 +560,9 @@ export default function DeviceSettingsScreen() {
                 }
               } catch (e) {
                 Alert.alert('Error', `Failed to test siren relay: ${e}`);
-                setDevice((d) => ({
+                updateAndSync((d) => ({
                   ...d,
-                  relays: { ...d.relays, siren: !v },
+                  relays: { ...d.relays, relay1_override: !v },
                 }));
               }
             }}
@@ -345,11 +572,11 @@ export default function DeviceSettingsScreen() {
             name="Test Ignition Relay"
             prefixIcon="bolt"
             toggle
-            toggleValue={device.relays.ignition}
+            toggleValue={device.relays.relay2_override}
             onToggle={async (v) => {
-              setDevice((d) => ({
+              updateAndSync((d) => ({
                 ...d,
-                relays: { ...d.relays, ignition: v },
+                relays: { ...d.relays, relay2_override: v },
               }));
               try {
                 if (v) {
@@ -359,9 +586,9 @@ export default function DeviceSettingsScreen() {
                 }
               } catch (e) {
                 Alert.alert('Error', `Failed to test ignition relay: ${e}`);
-                setDevice((d) => ({
+                updateAndSync((d) => ({
                   ...d,
-                  relays: { ...d.relays, ignition: !v },
+                  relays: { ...d.relays, relay2_override: !v },
                 }));
               }
             }}
@@ -371,7 +598,15 @@ export default function DeviceSettingsScreen() {
             name="Alarm Type"
             prefixIcon="exclamation-circle"
             suffixIcon="chevron-right"
-            onPress={() => router.navigate(ROUTES.MAP.DEVICE.ALARM_TYPE)}
+            onPress={() =>
+              router.navigate({
+                pathname: ROUTES.MAP.DEVICE.ALARM_TYPE,
+                params: {
+                  device_id: deviceId,
+                  device_color: device.color,
+                },
+              })
+            }
           />
         </TitleSection>
 

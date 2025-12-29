@@ -33,7 +33,7 @@ export default function Login() {
       setLoading(true);
       setSecure(true);
       await signInWithEmailAndPassword(auth, email.trim(), password);
-      router.replace('/(app)/map');
+      router.replace('/(guard)/(app)/map');
     } catch (e: any) {
       alert(e.message);
     } finally {
@@ -110,13 +110,17 @@ export default function Login() {
         </Pressable>
 
         {/* Secondary actions */}
-        <Pressable onPress={() => router.push('/(auth)/forgot-password')}>
+        <Pressable
+          onPress={() => router.push('/(guard)/(auth)/forgot-password')}
+        >
           <Text style={styles.link}>Forgot password?</Text>
         </Pressable>
 
-        <Pressable onPress={() => router.push('/(auth)/create-account')}>
+        <Pressable
+          onPress={() => router.push('/(guard)/(auth)/create-account')}
+        >
           <Text style={styles.link}>
-            Don’t have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Text style={styles.linkBold}>Create one</Text>
           </Text>
         </Pressable>

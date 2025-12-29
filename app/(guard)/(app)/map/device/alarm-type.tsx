@@ -1,37 +1,96 @@
-import React, { useState } from 'react';
-import { View, Text, Button } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, Button, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/ThemeContext';
 import TitleSection from '@/components/ui/TitleSection';
 import SegmentToggle from '@/components/ui/SegmentToggle';
 import HelperBox from '@/components/ui/HelperBoxProps';
 import Slider from '@react-native-community/slider';
+import { useAuth } from '@/context/AuthContext';
+import { useGlobalSearchParams } from 'expo-router';
+import {
+  patchDeviceAlarm,
+  type AlarmConfigBody,
+} from '@/services/user.service';
 
 export default function AlarmTypeScreen() {
   const { theme } = useTheme();
+  const { idToken } = useAuth();
+  const params = useGlobalSearchParams() as Record<string, string | undefined>;
+  const deviceId = params.device_id ?? '';
+
   const bgColor = theme === 'light' ? '#f0f0f0' : '#272727';
 
   const [frequency, setFrequency] = useState<'continuous' | 'intermittent'>(
     'continuous'
   );
-
-  const [trigger, setTrigger] = useState<'automatic' | 'manual'>('automatic');
-
+  const [trigger, setTrigger] = useState<'auto' | 'manual'>('auto');
   const [alarmDelay, setAlarmDelay] = useState(5);
   const [tempDelay, setTempDelay] = useState(alarmDelay);
+  const [saving, setSaving] = useState(false);
   const [showActionButtons, setShowActionButtons] = useState(false);
+
+  const updateAlarmConfig = useCallback(
+    async (config: AlarmConfigBody) => {
+      if (!idToken || !deviceId) return;
+      try {
+        setSaving(true);
+        await patchDeviceAlarm(idToken, deviceId, config);
+      } catch (e: any) {
+        console.error(e);
+        Alert.alert(
+          'Error',
+          e.message || 'Failed to update alarm configuration.'
+        );
+      } finally {
+        setSaving(false);
+      }
+    },
+    [idToken, deviceId]
+  );
+
+  // Update frequency immediately
+  useEffect(() => {
+    const body: AlarmConfigBody = {
+      relay1_alarm_type: frequency,
+      relay1_interval_sec: frequency === 'intermittent' ? 3 : null,
+      relay1_trigger_mode: trigger,
+      relay1_delay_sec: trigger === 'manual' ? alarmDelay : null,
+    };
+    updateAlarmConfig(body);
+  }, [alarmDelay, frequency, trigger, updateAlarmConfig]);
+
+  // Update trigger immediately
+  useEffect(() => {
+    const body: AlarmConfigBody = {
+      relay1_alarm_type: frequency,
+      relay1_interval_sec: frequency === 'intermittent' ? 3 : null,
+      relay1_trigger_mode: trigger,
+      relay1_delay_sec: trigger === 'manual' ? alarmDelay : null,
+    };
+    updateAlarmConfig(body);
+  }, [alarmDelay, frequency, trigger, updateAlarmConfig]);
 
   const handleDelayChange = (value: number) => {
     setTempDelay(value);
     setShowActionButtons(value !== alarmDelay);
   };
 
-  const handleSave = () => {
+  const handleSaveDelay = async () => {
     setAlarmDelay(tempDelay);
     setShowActionButtons(false);
+
+    const body: AlarmConfigBody = {
+      relay1_alarm_type: frequency,
+      relay1_interval_sec: frequency === 'intermittent' ? 3 : null,
+      relay1_trigger_mode: trigger,
+      relay1_delay_sec: tempDelay,
+    };
+
+    await updateAlarmConfig(body);
   };
 
-  const handleCancel = () => {
+  const handleCancelDelay = () => {
     setTempDelay(alarmDelay);
     setShowActionButtons(false);
   };
@@ -55,14 +114,7 @@ export default function AlarmTypeScreen() {
               { label: 'Intermittent', value: 'intermittent' },
             ]}
           />
-
-          <Text
-            style={{
-              marginTop: 8,
-              fontSize: 13,
-              color: '#888',
-            }}
-          >
+          <Text style={{ marginTop: 8, fontSize: 13, color: '#888' }}>
             {frequency === 'continuous'
               ? 'Siren will ring continuously without stopping.'
               : 'Siren rings every 3-5 seconds at intervals.'}
@@ -78,7 +130,7 @@ export default function AlarmTypeScreen() {
             value={trigger}
             onChange={setTrigger}
             options={[
-              { label: 'Automatic', value: 'automatic' },
+              { label: 'Automatic', value: 'auto' },
               { label: 'Manual', value: 'manual' },
             ]}
           />
@@ -129,9 +181,13 @@ export default function AlarmTypeScreen() {
                     marginTop: 12,
                   }}
                 >
-                  <Button title="Cancel" onPress={handleCancel} />
+                  <Button title="Cancel" onPress={handleCancelDelay} />
                   <View style={{ width: 8 }} />
-                  <Button title="Save" onPress={handleSave} />
+                  <Button
+                    title={saving ? 'Saving...' : 'Save'}
+                    onPress={handleSaveDelay}
+                    disabled={saving}
+                  />
                 </View>
               )}
             </View>

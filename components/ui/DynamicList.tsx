@@ -2,6 +2,7 @@ import { useTheme } from '@/context/ThemeContext';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   LayoutAnimation,
   StyleSheet,
@@ -29,9 +30,11 @@ export interface DynamicListItem {
   date?: Date;
 }
 
-interface DynamicListProps {
+type DynamicListProps = {
   items: DynamicListItem[];
-}
+  loading?: boolean;
+  emptyText?: string;
+};
 
 interface GroupedItems {
   dateKey: string;
@@ -39,7 +42,27 @@ interface GroupedItems {
   data: DynamicListItem[];
 }
 
-export default function DynamicList({ items }: DynamicListProps) {
+const isToday = (date: Date) => {
+  const now = new Date();
+  return (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  );
+};
+
+const getLocalDateKey = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+export default function DynamicList({
+  items,
+  loading = false,
+  emptyText = 'No items found',
+}: DynamicListProps) {
   const { theme } = useTheme();
   const textColor = theme === 'light' ? '#000' : '#fff';
 
@@ -60,22 +83,47 @@ export default function DynamicList({ items }: DynamicListProps) {
     setExpandedMap((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  // 🔹 Loading state (early return)
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  // 🔹 Empty state
+  if (!loading && items.length === 0) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ color: textColor, opacity: 0.6 }}>{emptyText}</Text>
+      </View>
+    );
+  }
+
   // 🔹 Split items
   const datedItems = items.filter((i) => i.date);
   const undatedItems = items.filter((i) => !i.date);
 
-  // 🔹 Group ONLY dated items
   const grouped: GroupedItems[] = Object.values(
     datedItems
       .slice()
-      .sort((a, b) => a.date!.getTime() - b.date!.getTime())
+      // 🔹 latest items first
+      .sort((a, b) => b.date!.getTime() - a.date!.getTime())
       .reduce((acc, item) => {
-        const dateKey = item.date!.toISOString().split('T')[0];
+        const dateKey = getLocalDateKey(item.date!);
 
         if (!acc[dateKey]) {
           acc[dateKey] = {
             dateKey,
-            label: new Date(dateKey).toDateString(),
+            label: isToday(item.date!)
+              ? 'Today'
+              : item.date!.toLocaleDateString(undefined, {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                }),
             data: [],
           };
         }
@@ -155,12 +203,17 @@ export default function DynamicList({ items }: DynamicListProps) {
 
 const styles = StyleSheet.create({
   group: {
-    marginVertical: 8,
+    padding: 16,
   },
   dateHeader: {
     fontSize: 14,
     fontWeight: '700',
     marginBottom: 4,
     marginHorizontal: 12,
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

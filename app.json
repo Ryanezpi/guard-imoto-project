@@ -17,6 +17,11 @@
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/icons/main-logo.png"
       },
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCNnec1m4ptsw7_aDP7ICCg4Qu46wdhUeY"
+        }
+      },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.kenshibu.guardimotoproject"
@@ -26,7 +31,18 @@
       "favicon": "./assets/icons/main-logo.png"
     },
     "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "custom photos permission",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to open the camera",
+
+          "//": "Disables the microphone permission",
+          "microphonePermission": false
+        }
+      ],
       "expo-router",
+      "expo-web-browser",
       [
         "expo-splash-screen",
         {
@@ -39,8 +55,7 @@
             "backgroundColor": "#000000"
           }
         }
-      ],
-      "expo-web-browser"
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

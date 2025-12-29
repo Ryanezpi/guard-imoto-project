@@ -5,24 +5,24 @@ export const ROUTES = {
   // ONBOARDING FLOW
   // ───────────────────────────────
   ONBOARDING: {
-    ROOT: '/(onboarding)',
-    WALKTHROUGH: '/(onboarding)/walkthrough',
-    PERMISSIONS: '/(onboarding)/permissions',
+    ROOT: '/(guard)/(onboarding)',
+    WALKTHROUGH: '/(guard)/(onboarding)/walkthrough',
+    PERMISSIONS: '/(guard)/(onboarding)/permissions',
   },
 
   // ───────────────────────────────
   // AUTH FLOW
   // ───────────────────────────────
   AUTH: {
-    ROOT: '/(auth)',
-    LOGIN: '/(auth)/login',
-    FORGOT_PASSWORD: '/(auth)/forgot-password',
+    ROOT: '/(guard)/(auth)',
+    LOGIN: '/(guard)/(auth)/login',
+    FORGOT_PASSWORD: '/(guard)/(auth)/forgot-password',
 
     CREATE_ACCOUNT: {
-      ROOT: '/(auth)/create-account',
-      USER_DETAILS: '/(auth)/create-account/user-details',
-      PASSWORD: '/(auth)/create-account/password',
-      PHONE_VERIFICATION: '/(auth)/create-account/phone-verification',
+      ROOT: '/(guard)/(auth)/create-account',
+      USER_DETAILS: '/(guard)/(auth)/create-account/user-details',
+      PASSWORD: '/(guard)/(auth)/create-account/password',
+      PHONE_VERIFICATION: '/(guard)/(auth)/create-account/phone-verification',
     },
   },
 
@@ -30,30 +30,30 @@ export const ROUTES = {
   // APP FLOW
   // ───────────────────────────────
   APP: {
-    ROOT: '/(app)', // App root
-    MAP: '/(app)/map', // Map screen
-    ALERTS: '/(app)/alerts', // Alerts list
-    ALERT_DETAIL: '/(app)/alerts/[id]', // Dynamic alert detail
-    SETTINGS: '/(app)/settings', // Settings screen
+    ROOT: '/(guard)/(app)', // App root
+    MAP: '/(guard)/(app)/map', // Map screen
+    ALERTS: '/(guard)/(app)/alerts', // Alerts list
+    ALERT_DETAIL: '/(guard)/(app)/alerts/[id]', // Dynamic alert detail
+    SETTINGS: '/(guard)/(app)/settings', // Settings screen
   },
   MAP: {
-    ROOT: '/(app)/map',
-    INDEX: '/(app)/map/index',
-    DEVICES: '/(app)/map/devices',
-    DEVICE_SETTINGS: '/(app)/map/device-settings',
+    ROOT: '/(guard)/(app)/map',
+    INDEX: '/(guard)/(app)/map/index',
+    DEVICES: '/(guard)/(app)/map/devices',
+    DEVICE_SETTINGS: '/(guard)/(app)/map/device-settings',
     DEVICE: {
-      BATTERY: '/(app)/map/device/battery',
-      NFC: '/(app)/map/device/nfc',
-      ALARM_TYPE: '/(app)/map/device/alarm-type',
+      BATTERY: '/(guard)/(app)/map/device/battery',
+      NFC: '/(guard)/(app)/map/device/nfc',
+      ALARM_TYPE: '/(guard)/(app)/map/device/alarm-type',
     },
   },
   PROFILE: {
-    ROOT: '/(app)/profile',
-    DEVICES: '/(app)/profile/devices',
-    EDIT: '/(app)/profile/edit',
-    LOGS: '/(app)/profile/logs',
-    NOTIFICATIONS: '/(app)/profile/notifications',
-    HELP: '/(app)/profile/help',
-    SECURITY: '/(app)/profile/security',
+    ROOT: '/(guard)/(app)/profile',
+    DEVICES: '/(guard)/(app)/profile/devices',
+    EDIT: '/(guard)/(app)/profile/edit',
+    LOGS: '/(guard)/(app)/profile/logs',
+    NOTIFICATIONS: '/(guard)/(app)/profile/notifications',
+    HELP: '/(guard)/(app)/profile/help',
+    SECURITY: '/(guard)/(app)/profile/security',
   },
 } as const;

@@ -205,6 +205,8 @@ export default function DynamicCard({
 
 const styles = StyleSheet.create({
   card: {
+    flex: 1, // fills parent width
+    alignSelf: 'stretch', // ensures nested cards expand
     borderRadius: 8,
     minHeight: 72,
     justifyContent: 'center',
@@ -214,14 +216,16 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    overflow: 'hidden', // prevent child from overflowing
+    overflow: 'hidden',
   },
   expandedContent: {
-    marginLeft: 24,
     marginTop: 8,
+    paddingLeft: 12, // inner padding
+    paddingRight: 12, // inner padding
     paddingBottom: 8,
+    flex: 1,
+    alignSelf: 'stretch',
   },
-
   row: {
     flexDirection: 'row',
     alignItems: 'center',

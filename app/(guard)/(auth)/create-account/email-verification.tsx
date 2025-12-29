@@ -15,10 +15,12 @@ import { sendEmailVerification, signOut } from 'firebase/auth';
 import DynamicCard from '@/components/ui/Card';
 import { ROUTES } from '@/constants/routes';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@/context/AuthContext';
 
 export default function EmailVerification() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { refreshUser } = useAuth();
 
   const bgColor = theme === 'light' ? '#ffffff' : '#272727';
   const cardColor = theme === 'light' ? '#ffffff' : '#1f1f1f';
@@ -75,7 +77,14 @@ export default function EmailVerification() {
     await currentUser.reload();
     if (currentUser.emailVerified) {
       console.log('Email verified!');
-      router.replace('/(app)/map');
+
+      // Refresh the backend user to update status
+      const updatedUser = await refreshUser();
+      if (updatedUser) {
+        router.replace('/(guard)/(app)/map');
+      } else {
+        setErrorMessage('Failed to refresh user, try again.');
+      }
     } else {
       setErrorMessage('Email not verified yet. Please check your inbox.');
     }

@@ -5,7 +5,6 @@ import { ROUTES } from '@/constants/routes';
 
 export default function Permissions() {
   const router = useRouter();
-
   const finishOnboarding = async () => {
     await AsyncStorage.setItem('@onboarding_complete', 'true');
     router.replace(ROUTES.AUTH.LOGIN);
@@ -15,7 +14,9 @@ export default function Permissions() {
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
       <Text>Permissions Screen</Text>
       <Pressable onPress={finishOnboarding}>
-        <Text>Finish Onboarding → Login</Text>
+        <Text style={{ marginTop: 16, color: '#2563EB' }}>
+          Finish Onboarding → Login
+        </Text>
       </Pressable>
     </View>
   );

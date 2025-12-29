@@ -1,8 +1,16 @@
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/context/ThemeContext';
+import { checkEmailAvailability } from '@/services/auth.service';
 
 export default function CreateAccount() {
   const router = useRouter();
@@ -18,20 +26,45 @@ export default function CreateAccount() {
     firstName: '',
     lastName: '',
     email: '',
+    phone: '',
   });
-
+  const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isValid, setIsValid] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   // Validation rules
   useEffect(() => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^09\d{9}$/;
 
     const valid =
       form.firstName.trim().length > 0 &&
       form.lastName.trim().length > 0 &&
-      emailRegex.test(form.email);
+      emailRegex.test(form.email) &&
+      phoneRegex.test(form.phone) &&
+      emailAvailable === true;
+
     setIsValid(valid);
-  }, [form]);
+  }, [form, emailAvailable]);
+
+  async function handleEmailCheck(email: string) {
+    if (!email) return;
+
+    setCheckingEmail(true);
+    setEmailError(null);
+
+    try {
+      const available = await checkEmailAvailability(email);
+      setEmailAvailable(available);
+    } catch (err: any) {
+      setEmailAvailable(null);
+      setEmailError(err.message || 'Unable to check email');
+    } finally {
+      setCheckingEmail(false);
+    }
+  }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
@@ -44,9 +77,10 @@ export default function CreateAccount() {
         {/* First Name */}
         <View style={styles.field}>
           <Text style={[styles.label, { color: subTextColor }]}>
-            First name
+            First name <Text style={{ color: 'red' }}>*</Text>
           </Text>
           <TextInput
+            autoCapitalize="sentences"
             style={[styles.input, { borderColor, color: textColor }]}
             placeholder="John"
             placeholderTextColor={subTextColor}
@@ -57,8 +91,11 @@ export default function CreateAccount() {
 
         {/* Last Name */}
         <View style={styles.field}>
-          <Text style={[styles.label, { color: subTextColor }]}>Last name</Text>
+          <Text style={[styles.label, { color: subTextColor }]}>
+            Last name <Text style={{ color: 'red' }}>*</Text>
+          </Text>
           <TextInput
+            autoCapitalize="sentences"
             style={[styles.input, { borderColor, color: textColor }]}
             placeholder="Doe"
             placeholderTextColor={subTextColor}
@@ -70,16 +107,62 @@ export default function CreateAccount() {
         {/* Email */}
         <View style={styles.field}>
           <Text style={[styles.label, { color: subTextColor }]}>
-            Email address
+            Email <Text style={{ color: 'red' }}>*</Text>
+          </Text>
+          <View
+            style={[
+              styles.inputWrapper,
+
+              {
+                borderColor:
+                  emailError || emailAvailable === false ? 'red' : borderColor,
+              },
+            ]}
+          >
+            <TextInput
+              style={[styles.inputInner, { color: textColor }]}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              placeholder="you@email.com"
+              placeholderTextColor={subTextColor}
+              value={form.email}
+              onChangeText={(v) => {
+                setForm((prev) => ({ ...prev, email: v }));
+                setEmailAvailable(null);
+
+                if (typingTimeout.current) clearTimeout(typingTimeout.current);
+
+                typingTimeout.current = setTimeout(() => {
+                  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                  if (emailRegex.test(v)) {
+                    handleEmailCheck(v);
+                  }
+                }, 500);
+              }}
+            />
+            {checkingEmail && (
+              <ActivityIndicator size="small" color="#2563EB" />
+            )}
+            {!checkingEmail && emailAvailable === true && (
+              <Text style={{ color: 'green', marginRight: 6 }}>✓</Text>
+            )}
+            {!checkingEmail && emailAvailable === false && (
+              <Text style={{ color: 'red', marginRight: 6 }}>✕</Text>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.field}>
+          <Text style={[styles.label, { color: subTextColor }]}>
+            Phone number
           </Text>
           <TextInput
             style={[styles.input, { borderColor, color: textColor }]}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            placeholder="you@email.com"
+            keyboardType="phone-pad"
+            placeholder="09XXxxxxxxx"
             placeholderTextColor={subTextColor}
-            value={form.email}
-            onChangeText={(v) => setForm({ ...form, email: v })}
+            value={form.phone}
+            onChangeText={(v) => setForm({ ...form, phone: v })}
           />
         </View>
 
@@ -89,7 +172,7 @@ export default function CreateAccount() {
           disabled={!isValid}
           onPress={() =>
             router.push({
-              pathname: '/(auth)/create-account/password',
+              pathname: '/(guard)/(auth)/create-account/password',
               params: form,
             })
           }
@@ -159,5 +242,20 @@ const styles = StyleSheet.create({
 
   buttonPressed: {
     opacity: 0.9,
+  },
+
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 48,
+  },
+
+  inputInner: {
+    flex: 1,
+    fontSize: 16,
+    paddingLeft: 8,
   },
 });
