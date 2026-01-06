@@ -42,3 +42,7 @@ app-example
 # generated native folders
 /ios
 /android
+
+google-services.json
+GoogleService-Info.plist
+guard-imoto-project-firebase-adminsdk-fbsvc-e7c194adc6.json

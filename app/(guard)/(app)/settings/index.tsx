@@ -11,6 +11,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import * as Clipboard from 'expo-clipboard';
 import * as Notifications from 'expo-notifications'; // Import Notifications
+import * as Device from 'expo-device';
 
 export default function SettingsScreen() {
   const { theme, toggleTheme } = useTheme();
@@ -39,20 +40,12 @@ export default function SettingsScreen() {
     }
   };
 
-  // --- Copy FCM Token (Device Push Identity) ---
   const copyFcmToken = async () => {
     try {
-      // 1. Check if we are in Expo Go
-      if (__DEV__ && !Notifications.getDevicePushTokenAsync) {
-        Alert.alert(
-          'Expo Go Limitation',
-          'FCM tokens require a Development Build. They no longer work in Expo Go (SDK 53+).'
-        );
-        return;
-      }
-
+      // 1️⃣ Permissions (still required everywhere)
       const { status: existingStatus } =
         await Notifications.getPermissionsAsync();
+
       let finalStatus = existingStatus;
       if (existingStatus !== 'granted') {
         const { status } = await Notifications.requestPermissionsAsync();
@@ -64,16 +57,36 @@ export default function SettingsScreen() {
         return;
       }
 
-      // This is the line that crashes Expo Go
-      const tokenData = await Notifications.getDevicePushTokenAsync();
-      await Clipboard.setStringAsync(tokenData.data);
-      Alert.alert('Success', 'FCM Token copied!');
-    } catch (err) {
-      console.log(err);
+      // 2️⃣ Expo Go detection
+      if (!Device.isDevice) {
+        Alert.alert(
+          'Unsupported Environment',
+          'Push tokens are not available on simulators or Expo Go.'
+        );
+        return;
+      }
 
+      // 3️⃣ FCM / APNs (Dev Build / Standalone only)
+      try {
+        const tokenData = await Notifications.getDevicePushTokenAsync();
+        await Clipboard.setStringAsync(tokenData.data);
+
+        Alert.alert('Success', 'FCM Token copied!');
+      } catch {
+        // 4️⃣ Fallback for Expo Go
+        const expoToken = await Notifications.getExpoPushTokenAsync();
+        await Clipboard.setStringAsync(expoToken.data);
+
+        Alert.alert(
+          'Expo Push Token Copied',
+          'This is NOT an FCM token. Use a Development Build to get FCM.'
+        );
+      }
+    } catch (err) {
+      console.error(err);
       Alert.alert(
-        'Build Error',
-        'FCM requires a Development Build (npx expo run:android).'
+        'Error',
+        'Something went wrong while fetching the push token.'
       );
     }
   };
