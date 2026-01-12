@@ -36,12 +36,7 @@ export default function DevicesScreen() {
       prefixIcon: 'exclamation-triangle',
       subText: new Date('2025-10-02T12:00:00').toISOString(),
     },
-    {
-      id: '1',
-      name: 'Battery',
-      prefixIcon: 'battery',
-      subText: '100%',
-    },
+
     {
       id: '2',
       name: 'Location',

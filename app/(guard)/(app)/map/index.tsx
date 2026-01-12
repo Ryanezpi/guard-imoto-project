@@ -8,8 +8,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useDevices } from '@/context/DeviceContext'; // import the device context
+import { useLoader } from '@/context/LoaderContext';
 
 export default function MapDashboard() {
+  const { hideLoader } = useLoader();
   const router = useRouter();
   const { theme } = useTheme();
   const { devices, loading } = useDevices(); // access global devices
@@ -39,8 +41,9 @@ export default function MapDashboard() {
       };
 
       setRegion(userRegion);
+      hideLoader();
     })();
-  }, []);
+  }, [hideLoader]);
 
   const getDeviceText = () => {
     if (loading) return 'Loading...';

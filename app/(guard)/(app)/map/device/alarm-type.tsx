@@ -12,13 +12,14 @@ import {
   patchDeviceAlarm,
   type AlarmConfigBody,
 } from '@/services/user.service';
+import { useDevices } from '@/context/DeviceContext';
 
 export default function AlarmTypeScreen() {
   const { theme } = useTheme();
   const { idToken } = useAuth();
   const params = useGlobalSearchParams() as Record<string, string | undefined>;
   const deviceId = params.device_id ?? '';
-
+  const { refreshDevices } = useDevices();
   const bgColor = theme === 'light' ? '#f0f0f0' : '#272727';
 
   const [frequency, setFrequency] = useState<'continuous' | 'intermittent'>(
@@ -29,15 +30,36 @@ export default function AlarmTypeScreen() {
   const [tempDelay, setTempDelay] = useState(alarmDelay);
   const [saving, setSaving] = useState(false);
   const [showActionButtons, setShowActionButtons] = useState(false);
+  const { devices } = useDevices();
+  const device = devices.find((d) => d.device_id === deviceId);
+
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (!device || initialized) return;
+
+    console.log('⚡ initializing alarm state from device:', device);
+
+    setFrequency(device.relay1_alarm_type ?? 'continuous');
+    setTrigger(device.relay1_trigger_mode ?? 'auto');
+    setAlarmDelay(device.relay1_delay_sec ?? 5);
+    setTempDelay(device.relay1_delay_sec ?? 5);
+
+    setInitialized(true);
+  }, [device, initialized]);
 
   const updateAlarmConfig = useCallback(
     async (config: AlarmConfigBody) => {
       if (!idToken || !deviceId) return;
+      console.log('🔄 Updating alarm config:', config);
+
       try {
         setSaving(true);
         await patchDeviceAlarm(idToken, deviceId, config);
+        console.log('✅ Patch successful, refreshing devices…');
+        await refreshDevices(); // <--- ensure global state is up-to-date
       } catch (e: any) {
-        console.error(e);
+        console.error('❌ Patch error:', e);
         Alert.alert(
           'Error',
           e.message || 'Failed to update alarm configuration.'
@@ -46,30 +68,22 @@ export default function AlarmTypeScreen() {
         setSaving(false);
       }
     },
-    [idToken, deviceId]
+    [idToken, deviceId, refreshDevices]
   );
 
-  // Update frequency immediately
   useEffect(() => {
-    const body: AlarmConfigBody = {
-      relay1_alarm_type: frequency,
-      relay1_interval_sec: frequency === 'intermittent' ? 3 : null,
-      relay1_trigger_mode: trigger,
-      relay1_delay_sec: trigger === 'manual' ? alarmDelay : null,
-    };
-    updateAlarmConfig(body);
-  }, [alarmDelay, frequency, trigger, updateAlarmConfig]);
+    if (!initialized) return; // wait until device state loaded
+    console.log('⚡ useEffect fired', { frequency, trigger, alarmDelay });
 
-  // Update trigger immediately
-  useEffect(() => {
     const body: AlarmConfigBody = {
       relay1_alarm_type: frequency,
       relay1_interval_sec: frequency === 'intermittent' ? 3 : null,
       relay1_trigger_mode: trigger,
       relay1_delay_sec: trigger === 'manual' ? alarmDelay : null,
     };
+
     updateAlarmConfig(body);
-  }, [alarmDelay, frequency, trigger, updateAlarmConfig]);
+  }, [frequency, trigger, alarmDelay, updateAlarmConfig, initialized]);
 
   const handleDelayChange = (value: number) => {
     setTempDelay(value);

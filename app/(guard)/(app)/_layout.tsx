@@ -118,18 +118,6 @@ function LayoutContent() {
         }}
       />
       <Stack.Screen
-        name="map/device/battery"
-        options={{
-          headerStyle: { backgroundColor: headerBg },
-          headerTitle: 'Battery Configuration',
-          headerTitleAlign: 'center',
-          headerTintColor: iconColor, // back button color
-          headerLeft: () => (
-            <NavButton route="back" iconName="arrow-left" color={titleColor} />
-          ),
-        }}
-      />
-      <Stack.Screen
         name="map/device/nfc"
         options={{
           headerStyle: { backgroundColor: headerBg },

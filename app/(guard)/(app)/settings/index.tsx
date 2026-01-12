@@ -10,8 +10,9 @@ import { router } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import * as Clipboard from 'expo-clipboard';
-import * as Notifications from 'expo-notifications'; // Import Notifications
+import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import * as Linking from 'expo-linking';
 
 export default function SettingsScreen() {
   const { theme, toggleTheme } = useTheme();
@@ -40,55 +41,55 @@ export default function SettingsScreen() {
     }
   };
 
-  const copyFcmToken = async () => {
-    try {
-      // 1️⃣ Permissions (still required everywhere)
-      const { status: existingStatus } =
-        await Notifications.getPermissionsAsync();
-
-      let finalStatus = existingStatus;
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-
-      if (finalStatus !== 'granted') {
-        Alert.alert('Permission Denied', 'Enable notifications in settings.');
-        return;
-      }
-
-      // 2️⃣ Expo Go detection
-      if (!Device.isDevice) {
-        Alert.alert(
-          'Unsupported Environment',
-          'Push tokens are not available on simulators or Expo Go.'
-        );
-        return;
-      }
-
-      // 3️⃣ FCM / APNs (Dev Build / Standalone only)
-      try {
-        const tokenData = await Notifications.getDevicePushTokenAsync();
-        await Clipboard.setStringAsync(tokenData.data);
-
-        Alert.alert('Success', 'FCM Token copied!');
-      } catch {
-        // 4️⃣ Fallback for Expo Go
-        const expoToken = await Notifications.getExpoPushTokenAsync();
-        await Clipboard.setStringAsync(expoToken.data);
-
-        Alert.alert(
-          'Expo Push Token Copied',
-          'This is NOT an FCM token. Use a Development Build to get FCM.'
-        );
-      }
-    } catch (err) {
-      console.error(err);
-      Alert.alert(
-        'Error',
-        'Something went wrong while fetching the push token.'
-      );
+  const handlePushToggle = async (nextValue: boolean) => {
+    // Turning OFF is always allowed
+    if (!nextValue) {
+      setPushNotificationsEnabled(false);
+      return;
     }
+
+    // Physical device required
+    if (!Device.isDevice) {
+      Alert.alert(
+        'Unsupported Device',
+        'Push notifications require a physical device.'
+      );
+      return;
+    }
+
+    // Check current permission
+    const { status: existingStatus } =
+      await Notifications.getPermissionsAsync();
+
+    let finalStatus = existingStatus;
+
+    // Request if not granted
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    // Still denied → force user to settings
+    if (finalStatus !== 'granted') {
+      Alert.alert(
+        'Notifications Disabled',
+        'Please enable notifications in system settings to receive alerts.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Open Settings',
+            onPress: () => Linking.openSettings(),
+          },
+        ]
+      );
+
+      // Ensure toggle stays OFF
+      setPushNotificationsEnabled(false);
+      return;
+    }
+
+    // ✅ Permission granted
+    setPushNotificationsEnabled(true);
   };
 
   return (
@@ -116,7 +117,7 @@ export default function SettingsScreen() {
             suffixIcon="chevron-right"
             toggle
             toggleValue={pushNotificationsEnabled}
-            onToggle={setPushNotificationsEnabled}
+            onToggle={handlePushToggle}
           />
         </TitleSection>
 
@@ -147,12 +148,6 @@ export default function SettingsScreen() {
             prefixIcon="code"
             suffixIcon="copy"
             onPress={copyIdToken}
-          />
-          <DynamicCard
-            name="Copy FCM Token (Push)"
-            prefixIcon="send"
-            suffixIcon="copy"
-            onPress={copyFcmToken}
           />
         </TitleSection>
 

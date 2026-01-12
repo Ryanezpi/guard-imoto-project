@@ -12,10 +12,13 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
+import { ROUTES } from '@/constants/routes';
+import { useLoader } from '@/context/LoaderContext';
 
 export default function Login() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { showLoader } = useLoader();
 
   const bgColor = theme === 'light' ? '#ffffff' : '#272727';
   const cardColor = theme === 'light' ? '#ffffff' : '#1f1f1f';
@@ -31,9 +34,9 @@ export default function Login() {
   const login = async () => {
     try {
       setLoading(true);
+      showLoader();
       setSecure(true);
       await signInWithEmailAndPassword(auth, email.trim(), password);
-      router.replace('/(guard)/(app)/map');
     } catch (e: any) {
       alert(e.message);
     } finally {
@@ -110,15 +113,11 @@ export default function Login() {
         </Pressable>
 
         {/* Secondary actions */}
-        <Pressable
-          onPress={() => router.push('/(guard)/(auth)/forgot-password')}
-        >
+        <Pressable onPress={() => router.push(ROUTES.AUTH.FORGOT_PASSWORD)}>
           <Text style={styles.link}>Forgot password?</Text>
         </Pressable>
 
-        <Pressable
-          onPress={() => router.push('/(guard)/(auth)/create-account')}
-        >
+        <Pressable onPress={() => router.push(ROUTES.AUTH.CREATE_ACCOUNT.ROOT)}>
           <Text style={styles.link}>
             Don&apos;t have an account?{' '}
             <Text style={styles.linkBold}>Create one</Text>

@@ -7,7 +7,7 @@ export default function Walkthrough() {
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
       <Text>Walkthrough</Text>
-      <Pressable onPress={() => router.navigate(ROUTES.ONBOARDING.PERMISSIONS)}>
+      <Pressable onPress={() => router.replace(ROUTES.ONBOARDING.PERMISSIONS)}>
         <Text>Next → Permissions</Text>
       </Pressable>
     </View>

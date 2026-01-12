@@ -10,6 +10,9 @@ import * as SecureStore from 'expo-secure-store';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getMeAPI } from '@/services/user.service';
+import { useLoader } from './LoaderContext';
+import { ROUTES } from '@/constants/routes';
+import { router } from 'expo-router';
 
 type Status = 'checking' | 'unauthenticated' | 'authenticated' | 'new-user';
 
@@ -38,6 +41,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const TOKEN_KEY = 'idToken';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { hideLoader } = useLoader();
   const [status, setStatus] = useState<Status>('checking');
   const [user, setUser] = useState<User | null>(null);
   const [idToken, setIdToken] = useState<string | null>(null);
@@ -79,12 +83,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const latestUser = await getMeAPI(idToken);
       setUser(latestUser);
       setStatus('authenticated');
+      hideLoader();
       return latestUser;
     } catch (err) {
       console.log('Failed to refresh user:', err);
       return null;
     }
-  }, [idToken]);
+  }, [hideLoader, idToken]);
 
   /* ---------------------------------- */
   /* Handle Firebase auth changes        */
@@ -110,8 +115,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const me = await getMeAPI(token);
           setUser(me);
           setStatus('authenticated');
-          console.log('Authenticated user:', me);
 
+          router.replace(ROUTES.MAP.ROOT);
+          console.log('Authenticated user:', me);
+          hideLoader();
           scheduleTokenRefresh();
         } catch (err) {
           console.log('Backend user not created yet:', err);
@@ -124,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubscribe();
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
     };
-  }, [scheduleTokenRefresh]);
+  }, [hideLoader, scheduleTokenRefresh]);
 
   /* ---------------------------------- */
   /* Logout                             */

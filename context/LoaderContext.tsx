@@ -1,6 +1,6 @@
 // LoaderContext.tsx
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { createContext, useContext, useState } from 'react';
+import { View, ActivityIndicator, StyleSheet, Modal } from 'react-native';
 
 interface LoaderContextType {
   showLoader: () => void;
@@ -14,7 +14,7 @@ const LoaderContext = createContext<LoaderContextType>({
 
 export const useLoader = () => useContext(LoaderContext);
 
-export const LoaderProvider = ({ children }: { children: ReactNode }) => {
+export const LoaderProvider = ({ children }: { children: React.ReactNode }) => {
   const [visible, setVisible] = useState(false);
 
   const showLoader = () => setVisible(true);
@@ -24,9 +24,11 @@ export const LoaderProvider = ({ children }: { children: ReactNode }) => {
     <LoaderContext.Provider value={{ showLoader, hideLoader }}>
       {children}
       {visible && (
-        <View style={styles.overlay}>
-          <ActivityIndicator size="large" color="#ffffff" />
-        </View>
+        <Modal transparent animationType="none" visible>
+          <View style={styles.overlay}>
+            <ActivityIndicator size="large" color="#ffffff" />
+          </View>
+        </Modal>
       )}
     </LoaderContext.Provider>
   );
@@ -38,6 +40,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 9999,
   },
 });

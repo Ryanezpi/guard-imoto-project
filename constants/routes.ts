@@ -5,9 +5,9 @@ export const ROUTES = {
   // ONBOARDING FLOW
   // ───────────────────────────────
   ONBOARDING: {
-    ROOT: '/(guard)/(onboarding)',
-    WALKTHROUGH: '/(guard)/(onboarding)/walkthrough',
-    PERMISSIONS: '/(guard)/(onboarding)/permissions',
+    ROOT: '/(onboarding)',
+    WALKTHROUGH: '/(onboarding)/walkthrough',
+    PERMISSIONS: '/(onboarding)/permissions',
   },
 
   // ───────────────────────────────
@@ -42,7 +42,6 @@ export const ROUTES = {
     DEVICES: '/(guard)/(app)/map/devices',
     DEVICE_SETTINGS: '/(guard)/(app)/map/device-settings',
     DEVICE: {
-      BATTERY: '/(guard)/(app)/map/device/battery',
       NFC: '/(guard)/(app)/map/device/nfc',
       ALARM_TYPE: '/(guard)/(app)/map/device/alarm-type',
     },

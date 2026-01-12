@@ -6,6 +6,7 @@ import { DEVICE_COLORS } from '@/constants/colors';
 import { ROUTES } from '@/constants/routes';
 import { useAuth } from '@/context/AuthContext';
 import { useDevices } from '@/context/DeviceContext';
+import { useLoader } from '@/context/LoaderContext';
 import { useTheme } from '@/context/ThemeContext';
 import { patchDeviceConfig } from '@/services/user.service';
 import { router, useGlobalSearchParams } from 'expo-router';
@@ -35,7 +36,6 @@ type DeviceState = {
     vibration: boolean;
     movement: boolean;
     tremors: boolean;
-    lowBattery: boolean;
   };
 
   relays: {
@@ -66,7 +66,6 @@ function mapApiDeviceToState(api: any): DeviceState {
 
     alerts: {
       sms: api.sms_alerts_enabled ?? false,
-      lowBattery: api.low_battery ?? false,
       vibration: api.vibration ?? false,
       movement: api.movement ?? false,
       tremors: api.tremors ?? false,
@@ -118,19 +117,15 @@ function mapStateToPatchConfig(state: DeviceState) {
     relay2_enabled: state.relays.ignition,
     relay2_override: state.relays.relay2_override,
 
-    // Alerts
-    battery_saver_enabled: state.alerts.lowBattery,
-    battery_saver_threshold: state.alerts.lowBattery ? 20 : null,
-
     sms_alerts_enabled: state.alerts.sms,
     vibration: state.alerts.vibration,
     movement: state.alerts.movement,
     tremors: state.alerts.tremors,
-    low_battery: state.alerts.lowBattery,
   };
 }
 
 export default function DeviceSettingsScreen() {
+  const { showLoader, hideLoader } = useLoader();
   const { theme } = useTheme();
   const { idToken } = useAuth();
   const { refreshDevices } = useDevices();
@@ -179,11 +174,6 @@ export default function DeviceSettingsScreen() {
 
     // Alerts
     addIfChanged('sms_alerts_enabled', prev.alerts.sms, next.alerts.sms);
-    addIfChanged(
-      'battery_saver_enabled',
-      prev.alerts.lowBattery,
-      next.alerts.lowBattery
-    );
 
     // Relay 1
     addIfChanged(
@@ -232,7 +222,7 @@ export default function DeviceSettingsScreen() {
   }
 
   useEffect(() => {
-    if (!devices || !deviceId) return;
+    if (!devices || !deviceId || device) return; // only run if device is not yet loaded
 
     const apiDevice = devices.find((d) => d.device_id === deviceId);
     if (!apiDevice) return;
@@ -240,7 +230,7 @@ export default function DeviceSettingsScreen() {
     const mapped = mapApiDeviceToState(apiDevice);
     setDevice(mapped);
     setDraft(mapped);
-  }, [devices, deviceId]);
+  }, [devices, deviceId, device]);
 
   const updateAndSync = (updater: (d: DeviceState) => DeviceState) => {
     setDevice((prev) => {
@@ -289,11 +279,12 @@ export default function DeviceSettingsScreen() {
         }}
         onConfirm={async () => {
           try {
+            showLoader();
             const payload = mapStateToPatchConfig(draft);
             console.log(payload);
 
             await patchDeviceConfig(idToken!, deviceId!, payload);
-            await refreshDevices();
+            await refreshDevices().then(hideLoader);
 
             setDevice(draft);
             setShowEditModal(false);
@@ -399,13 +390,12 @@ export default function DeviceSettingsScreen() {
           />
 
           <DynamicCard
-            name="Battery"
-            prefixIcon="battery"
-            subText="100%"
+            name="Link NFC Tag"
+            prefixIcon="qrcode"
             suffixIcon="chevron-right"
             onPress={() =>
               router.navigate({
-                pathname: ROUTES.MAP.DEVICE.BATTERY,
+                pathname: ROUTES.MAP.DEVICE.NFC,
                 params: {
                   device_id: deviceId,
                   device_color: device.color,
@@ -481,60 +471,39 @@ export default function DeviceSettingsScreen() {
               }))
             }
           />
-
-          <DynamicCard
-            name="Link NFC Tag"
-            prefixIcon="qrcode"
-            suffixIcon="chevron-right"
-            onPress={() =>
-              router.navigate({
-                pathname: ROUTES.MAP.DEVICE.NFC,
-                params: {
-                  device_id: deviceId,
-                  device_color: device.color,
-                },
-              })
-            }
-          />
         </TitleSection>
 
         <TitleSection
           title="Alerts"
           subtitle="Configure when and how you are notified."
         >
-          {(['vibration', 'movement', 'tremors', 'lowBattery'] as const).map(
-            (key) => (
-              <DynamicCard
-                key={key}
-                name={
-                  key === 'vibration'
-                    ? 'Vibration Alerts'
-                    : key === 'movement'
-                    ? 'Movement Detection'
-                    : key === 'tremors'
-                    ? 'Repeated Tremors'
-                    : 'Low Device Battery'
-                }
-                prefixIcon={
-                  key === 'vibration'
-                    ? 'exclamation-triangle'
-                    : key === 'movement'
-                    ? 'arrows'
-                    : key === 'tremors'
-                    ? 'warning'
-                    : 'battery-quarter'
-                }
-                toggle
-                toggleValue={device.alerts[key]}
-                onToggle={(v) =>
-                  updateAndSync((d) => ({
-                    ...d,
-                    alerts: { ...d.alerts, [key]: v },
-                  }))
-                }
-              />
-            )
-          )}
+          {(['vibration', 'movement', 'tremors'] as const).map((key) => (
+            <DynamicCard
+              key={key}
+              name={
+                key === 'vibration'
+                  ? 'Vibration Alerts'
+                  : key === 'movement'
+                  ? 'Movement Detection'
+                  : 'Repeated Tremors'
+              }
+              prefixIcon={
+                key === 'vibration'
+                  ? 'exclamation-triangle'
+                  : key === 'movement'
+                  ? 'arrows'
+                  : 'warning'
+              }
+              toggle
+              toggleValue={device.alerts[key]}
+              onToggle={(v) =>
+                updateAndSync((d) => ({
+                  ...d,
+                  alerts: { ...d.alerts, [key]: v },
+                }))
+              }
+            />
+          ))}
         </TitleSection>
 
         {/* OVERRIDE / TESTING */}
@@ -542,6 +511,21 @@ export default function DeviceSettingsScreen() {
           title="Override & Testing"
           subtitle="Manual testing and forced actions."
         >
+          <DynamicCard
+            name="Alarm Type"
+            prefixIcon="exclamation-circle"
+            suffixIcon="chevron-right"
+            onPress={() =>
+              router.navigate({
+                pathname: ROUTES.MAP.DEVICE.ALARM_TYPE,
+                params: {
+                  device_id: deviceId,
+                  device_color: device.color,
+                },
+              })
+            }
+          />
+
           <DynamicCard
             name="Test Siren Relay"
             prefixIcon="bullhorn"
@@ -592,21 +576,6 @@ export default function DeviceSettingsScreen() {
                 }));
               }
             }}
-          />
-
-          <DynamicCard
-            name="Alarm Type"
-            prefixIcon="exclamation-circle"
-            suffixIcon="chevron-right"
-            onPress={() =>
-              router.navigate({
-                pathname: ROUTES.MAP.DEVICE.ALARM_TYPE,
-                params: {
-                  device_id: deviceId,
-                  device_color: device.color,
-                },
-              })
-            }
           />
         </TitleSection>
 

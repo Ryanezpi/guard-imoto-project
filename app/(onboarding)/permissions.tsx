@@ -7,6 +7,8 @@ export default function Permissions() {
   const router = useRouter();
   const finishOnboarding = async () => {
     await AsyncStorage.setItem('@onboarding_complete', 'true');
+
+    // Force Guard to re-evaluate with correct state
     router.replace(ROUTES.AUTH.LOGIN);
   };
 
