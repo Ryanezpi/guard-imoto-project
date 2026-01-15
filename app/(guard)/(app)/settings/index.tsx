@@ -1,12 +1,12 @@
 import DynamicCard from '@/components/ui/Card';
 import TitleSection from '@/components/ui/TitleSection';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScrollView, View, Alert } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ROUTES } from '@/constants/routes';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import * as Clipboard from 'expo-clipboard';
@@ -18,9 +18,34 @@ export default function SettingsScreen() {
   const { theme, toggleTheme } = useTheme();
   const [pushNotificationsEnabled, setPushNotificationsEnabled] =
     useState(false);
+  useEffect(() => {
+    const syncPushPermission = async () => {
+      const { status } = await Notifications.getPermissionsAsync();
+      setPushNotificationsEnabled(status === 'granted');
+    };
+
+    syncPushPermission();
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      Notifications.getPermissionsAsync().then(({ status }) => {
+        setPushNotificationsEnabled(status === 'granted');
+      });
+    }, [])
+  );
 
   const bgColor = theme === 'light' ? '#f0f0f0' : '#272727ff';
-
+  const resetApp = async () => {
+    try {
+      await AsyncStorage.clear();
+      await signOut(auth);
+      console.log('App storage and Auth cleared!');
+      router.replace(ROUTES.AUTH.LOGIN);
+    } catch (e) {
+      console.error('Failed to reset app', e);
+    }
+  };
   // --- Copy ID Token (User Auth) ---
   const copyIdToken = async () => {
     try {
@@ -148,6 +173,11 @@ export default function SettingsScreen() {
             prefixIcon="code"
             suffixIcon="copy"
             onPress={copyIdToken}
+          />
+          <DynamicCard
+            name="Reset App (Clear Storage & Logout)"
+            prefixIcon="trash"
+            onPress={resetApp}
           />
         </TitleSection>
 

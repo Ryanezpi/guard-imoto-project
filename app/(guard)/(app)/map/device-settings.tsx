@@ -1,6 +1,7 @@
 import DynamicCard from '@/components/ui/Card';
 import DevicePrefix from '@/components/ui/DevicePrefix';
 import ConfirmModal from '@/components/ui/forms/ConfirmModal';
+import SegmentToggle from '@/components/ui/SegmentToggle';
 import TitleSection from '@/components/ui/TitleSection';
 import { DEVICE_COLORS } from '@/constants/colors';
 import { ROUTES } from '@/constants/routes';
@@ -8,7 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useDevices } from '@/context/DeviceContext';
 import { useLoader } from '@/context/LoaderContext';
 import { useTheme } from '@/context/ThemeContext';
-import { patchDeviceConfig } from '@/services/user.service';
+import { patchDeviceConfig, unlinkDevice } from '@/services/user.service';
 import { router, useGlobalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -21,11 +22,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import PubNub from 'pubnub';
+const pubnub = new PubNub({
+  subscribeKey: process.env.EXPO_PUBLIC_PUBNUB_SUBSCRIBE_KEY || 'demo',
+  publishKey: process.env.EXPO_PUBLIC_PUBNUB_PUBLISH_KEY || 'demo',
+  ssl: true,
+  uuid: 'anonymous',
+});
+
 type DeviceState = {
   name: string;
   color: string;
   enabled: boolean;
-
+  pubnub_channel?: string;
   sensors: {
     gyroscope: boolean;
     gps: boolean;
@@ -58,7 +67,7 @@ function mapApiDeviceToState(api: any): DeviceState {
     name: api.device_name ?? api.serial_number,
     color: api.device_color ?? '#E53935',
     enabled: api.paired,
-
+    pubnub_channel: api.pubnub_channel ?? undefined,
     sensors: {
       gyroscope: api.gyroscope_enabled ?? false,
       gps: api.gps_enabled ?? false,
@@ -137,7 +146,8 @@ export default function DeviceSettingsScreen() {
   const deviceId = params.device_id;
 
   const { devices } = useDevices();
-
+  const [readMode, setReadMode] = useState<'realtime' | 'interval'>('interval');
+  const [intervalSec, setIntervalSec] = useState(60);
   const [device, setDevice] = useState<DeviceState | null>(null);
   const [draft, setDraft] = useState<DeviceState | null>(null);
 
@@ -255,6 +265,46 @@ export default function DeviceSettingsScreen() {
       return next;
     });
   };
+  useEffect(() => {
+    let subscription: any;
+
+    if (readMode === 'realtime') {
+      // subscribe to PubNub channel for this device
+      subscription = pubnub.subscribe({
+        channels: [device?.pubnub_channel!],
+      });
+      console.log('Device pubnub_channel:', device?.pubnub_channel);
+      console.log('Device ID:', deviceId);
+
+      pubnub.addListener({
+        message: (msg) => {
+          console.log('Realtime device data:', msg.message);
+          // update device state here
+        },
+      });
+    }
+
+    return () => {
+      if (subscription) pubnub.unsubscribeAll();
+    };
+  }, [readMode, deviceId, device?.pubnub_channel]);
+  useEffect(() => {
+    if (readMode !== 'interval') return;
+
+    const interval = setInterval(async () => {
+      if (!idToken || !deviceId) return;
+
+      try {
+        // const data = await getDeviceDataAPI(idToken, deviceId);
+        // console.log('Interval device data:', data);
+        // update device state here
+      } catch (err) {
+        console.error('Failed to fetch interval data', err);
+      }
+    }, intervalSec * 1000);
+
+    return () => clearInterval(interval);
+  }, [readMode, intervalSec, deviceId, idToken]);
 
   if (!device || !draft) {
     return (
@@ -377,6 +427,26 @@ export default function DeviceSettingsScreen() {
       </ConfirmModal>
 
       <ScrollView contentContainerStyle={{ padding: 16 }}>
+        <TitleSection
+          title="Data Read Mode"
+          subtitle="Choose how the device data is fetched."
+        >
+          <SegmentToggle
+            value={readMode}
+            onChange={(val) => setReadMode(val)}
+            options={[
+              { label: 'Realtime', value: 'realtime' },
+              { label: 'Interval', value: 'interval' },
+            ]}
+          />
+
+          {readMode === 'interval' && (
+            <Text style={{ marginTop: 8, fontSize: 13, color: '#888' }}>
+              Fetches device data every {intervalSec} seconds.
+            </Text>
+          )}
+        </TitleSection>
+
         {/* DEVICE SETTINGS */}
         <TitleSection title="Device Settings">
           <DynamicCard
@@ -597,7 +667,18 @@ export default function DeviceSettingsScreen() {
           name="Unpair Device"
           prefixIcon="sign-out"
           prefixColor="#ff4d4f"
-          onPress={() => console.warn('Unpair device')}
+          onPress={() => {
+            showLoader();
+            unlinkDevice(idToken!, deviceId!)
+              .catch((e) => {
+                Alert.alert('Error', `Failed to unpair device: ${e}`);
+              })
+              .then(() => {
+                hideLoader();
+                refreshDevices();
+                router.back();
+              });
+          }}
         />
       </ScrollView>
     </SafeAreaView>

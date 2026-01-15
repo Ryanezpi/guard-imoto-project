@@ -175,6 +175,7 @@ export default function DynamicCard({
               onValueChange={onToggle}
               trackColor={{ false: '#ccc', true: '#4e8cff' }}
               thumbColor="#fff"
+              ios_backgroundColor="#3e3e3e"
             />
           ) : expandable ? (
             <FontAwesome

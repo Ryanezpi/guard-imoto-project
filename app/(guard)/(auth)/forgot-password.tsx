@@ -1,18 +1,18 @@
-import {
-  View,
-  TextInput,
-  Pressable,
-  Text,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import { auth } from '@/lib/firebase';
-import { sendPasswordResetEmail } from 'firebase/auth';
 import { useRouter } from 'expo-router';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ForgotPassword() {
   const { theme } = useTheme();
@@ -27,7 +27,7 @@ export default function ForgotPassword() {
   const bgColor = theme === 'light' ? '#ffffff' : '#272727';
   const cardColor = theme === 'light' ? '#ffffff' : '#1f1f1f';
   const textColor = theme === 'light' ? '#111827' : '#f9fafb';
-  const subTextColor = theme === 'light' ? '#6b7280' : '#9ca3af';
+  const subTextColor = theme === 'light' ? '#1C1C1E' : '#9ca3af';
   const borderColor = theme === 'light' ? '#d1d5db' : '#3f3f46';
 
   const submit = async () => {

@@ -146,6 +146,7 @@ export default function DynamicList({
                 name={cardItem.name}
                 value={cardItem.value}
                 subText={cardItem.subText}
+                subTextColor={cardItem.subTextColor}
                 nameTextBold={!cardItem.subTextBold}
                 prefixElement={cardItem.prefixElement}
                 prefixColor={cardItem.prefixColor}
@@ -178,6 +179,7 @@ export default function DynamicList({
               name={cardItem.name}
               value={cardItem.value}
               subText={cardItem.subText}
+              subTextColor={cardItem.subTextColor}
               nameTextBold={!cardItem.subTextBold}
               prefixIcon={cardItem.prefixIcon}
               prefixElement={cardItem.prefixElement}

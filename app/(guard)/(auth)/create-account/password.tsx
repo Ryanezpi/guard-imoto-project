@@ -1,11 +1,11 @@
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '@/context/ThemeContext';
+import { auth } from '@/lib/firebase';
+import { registerUserWithBackend } from '@/services/auth.service';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { useState, useEffect } from 'react';
-import { useTheme } from '@/context/ThemeContext';
-import { registerUserWithBackend } from '@/services/auth.service';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function PasswordStep() {
   const params = useLocalSearchParams();
@@ -15,7 +15,7 @@ export default function PasswordStep() {
   const bgColor = theme === 'light' ? '#ffffff' : '#272727';
   const cardColor = theme === 'light' ? '#ffffff' : '#1f1f1f';
   const textColor = theme === 'light' ? '#111827' : '#f9fafb';
-  const subTextColor = theme === 'light' ? '#6b7280' : '#9ca3af';
+  const subTextColor = theme === 'light' ? '#1C1C1E' : '#9ca3af';
   const borderColor = theme === 'light' ? '#d1d5db' : '#3f3f46';
 
   const [password, setPassword] = useState('');

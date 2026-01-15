@@ -12,10 +12,12 @@
     "hdpi",
     "imoto",
     "Moto",
+    "pubnub",
     "qrcode",
     "RFID",
     "SVSS",
     "unpair",
-    "unsub"
+    "unsub",
+    "worklets"
   ]
 }

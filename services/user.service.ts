@@ -1,5 +1,5 @@
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
-const API_BASE = process.env.EXPO_PRIVATE_API_BASE;
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
 
 export interface AuditLog {
   id: string;
@@ -258,6 +258,28 @@ export async function unlinkNFC(idToken: string, nfcId: string) {
   if (!res.ok) {
     const err = await res.text();
     throw new Error(err || 'Failed to unlink NFC');
+  }
+
+  return res.json();
+}
+
+/**
+ * Unlink (unpair) a device
+ */
+export async function unlinkDevice(idToken: string, deviceId: string) {
+  const res = await fetch(`${API_BASE}/devices/unpair/${deviceId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
+  });
+
+  console.log(`Unlinking device: ${deviceId}`);
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || 'Failed to unlink device');
   }
 
   return res.json();

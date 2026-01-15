@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/ThemeContext';
@@ -106,7 +107,7 @@ export default function DeviceNFCCardScreen() {
             </Text>
             <Text style={{ color: textColor }}>ID: {nfc.id}</Text>
             <Text style={{ color: textColor }}>
-              Paired At:{' '}
+              Paired At:
               {nfc.paired_at ? new Date(nfc.paired_at).toLocaleString() : 'N/A'}
             </Text>
             <Button
@@ -151,11 +152,30 @@ export default function DeviceNFCCardScreen() {
                   backgroundColor: theme === 'light' ? '#fff' : '#1f1f1f',
                 }}
               />
-              <Button
-                title={linking ? 'Linking...' : 'Link NFC manually'}
+
+              {/* Styled Manual Link Button */}
+              <Pressable
                 onPress={() => handleLinkNFC(manualInput)}
                 disabled={!manualInput || linking}
-              />
+                style={({ pressed }) => [
+                  {
+                    marginTop: 12,
+                    height: 52,
+                    borderRadius: 14,
+                    backgroundColor: '#2563EB',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: pressed ? 0.9 : 1,
+                  },
+                  (!manualInput || linking) && { opacity: 0.6 },
+                ]}
+              >
+                <Text
+                  style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}
+                >
+                  {linking ? 'Linking...' : 'Link NFC manually'}
+                </Text>
+              </Pressable>
             </View>
           </>
         )}

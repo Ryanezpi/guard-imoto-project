@@ -1,16 +1,16 @@
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import { checkEmailAvailability } from '@/services/auth.service';
+import { useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function CreateAccount() {
   const router = useRouter();
@@ -19,7 +19,7 @@ export default function CreateAccount() {
   const bgColor = theme === 'light' ? '#ffffff' : '#272727';
   const cardColor = theme === 'light' ? '#ffffff' : '#1f1f1f';
   const textColor = theme === 'light' ? '#111827' : '#f9fafb';
-  const subTextColor = theme === 'light' ? '#6b7280' : '#9ca3af';
+  const subTextColor = theme === 'light' ? '#1C1C1E' : '#9ca3af';
   const borderColor = theme === 'light' ? '#d1d5db' : '#3f3f46';
 
   const [form, setForm] = useState({

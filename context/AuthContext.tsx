@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getMeAPI } from '@/services/user.service';
@@ -25,6 +26,7 @@ export type User = {
   phone: string;
   photo_url: string | null;
   notifications_enabled: boolean;
+  expo_push_token?: string | null; // <- add optional token
 };
 
 type AuthContextType = {
@@ -39,6 +41,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const TOKEN_KEY = 'idToken';
+const EXPO_TOKEN_KEY = '@expo_push_token';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { hideLoader } = useLoader();
@@ -59,18 +62,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await SecureStore.setItemAsync(TOKEN_KEY, newToken);
     setIdToken(newToken);
 
-    // Schedule next refresh
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
     refreshTimer.current = setTimeout(refreshToken, 45 * 60 * 1000);
   }, []);
 
-  /* ---------------------------------- */
-  /* Schedule token refresh             */
-  /* ---------------------------------- */
   const scheduleTokenRefresh = useCallback(() => {
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
-
-    // Refresh 15 minutes before expiry (45 mins)
     refreshTimer.current = setTimeout(refreshToken, 45 * 60 * 1000);
   }, [refreshToken]);
 
@@ -80,11 +77,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = useCallback(async () => {
     if (!idToken) return null;
     try {
-      const latestUser = await getMeAPI(idToken);
-      setUser(latestUser);
+      const me = await getMeAPI(idToken);
+
+      // Check if we have a stored Expo push token
+      const storedToken = await AsyncStorage.getItem(EXPO_TOKEN_KEY);
+      if (storedToken) {
+        // await updateExpoTokenAPI(storedToken, idToken);
+        me.expo_push_token = storedToken;
+      }
+
+      setUser(me);
       setStatus('authenticated');
       hideLoader();
-      return latestUser;
+      return me;
     } catch (err) {
       console.log('Failed to refresh user:', err);
       return null;
@@ -113,6 +118,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIdToken(token);
 
           const me = await getMeAPI(token);
+
+          // Add stored Expo token if present
+          const storedToken = await AsyncStorage.getItem(EXPO_TOKEN_KEY);
+          if (storedToken) {
+            // await updateExpoTokenAPI(storedToken, token);
+            me.expo_push_token = storedToken;
+          }
+
           setUser(me);
           setStatus('authenticated');
 
@@ -133,9 +146,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [hideLoader, scheduleTokenRefresh]);
 
-  /* ---------------------------------- */
-  /* Logout                             */
-  /* ---------------------------------- */
   const logout = async () => {
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
     await SecureStore.deleteItemAsync(TOKEN_KEY);

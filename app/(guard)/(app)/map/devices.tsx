@@ -1,39 +1,39 @@
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  Alert,
-  Modal,
-  ActivityIndicator,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import React, { useState, useEffect } from 'react';
-import {
-  CameraView,
-  CameraType,
-  useCameraPermissions,
-  BarcodeScanningResult,
-} from 'expo-camera';
-import { useTheme } from '@/context/ThemeContext';
-import DynamicList, { DynamicListItem } from '@/components/ui/DynamicList';
 import AddDeviceCard from '@/components/ui/AddDeviceCard';
 import DevicePrefix from '@/components/ui/DevicePrefix';
-import { router } from 'expo-router';
+import DynamicList, { DynamicListItem } from '@/components/ui/DynamicList';
 import { useAuth } from '@/context/AuthContext';
-import { createDevice } from '@/services/user.service';
 import { useDevices } from '@/context/DeviceContext';
+import { useTheme } from '@/context/ThemeContext';
+import { createDevice } from '@/services/user.service';
+import {
+  BarcodeScanningResult,
+  CameraType,
+  CameraView,
+  useCameraPermissions,
+} from 'expo-camera';
+import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function MapDevicesScreen() {
   const { theme } = useTheme();
   const { idToken } = useAuth();
   const { devices: initial_devices, refreshDevices } = useDevices();
 
-  const bgColor = theme === 'light' ? '#ffffff' : '#272727';
+  const bgColor = theme === 'light' ? '#f0f0f0' : '#272727';
   const cardColor = theme === 'light' ? '#ffffff' : '#1f1f1f';
   const textColor = theme === 'light' ? '#111827' : '#f9fafb';
-  const subTextColor = theme === 'light' ? '#6b7280' : '#9ca3af';
+  const subTextColor = theme === 'light' ? '#1C1C1E' : '#9ca3af';
   const borderColor = theme === 'light' ? '#d1d5db' : '#3f3f46';
 
   const [items, setItems] = useState<DynamicListItem[]>([]);
@@ -58,7 +58,7 @@ export default function MapDevicesScreen() {
       name: d.device_name ?? d.serial_number,
       prefixElement: <DevicePrefix color={d.device_color ?? '#E53935'} />,
       subText: d.paired ? 'Enabled' : 'Disabled',
-      subTextColor: d.paired ? '#2fa500ff' : '#999',
+      subTextColor: d.paired ? '#2fa500ff' : '#E53935',
       suffixIcon: 'chevron-right' as const,
       onPress: () =>
         router.navigate({
@@ -98,7 +98,7 @@ export default function MapDevicesScreen() {
           name: device.device_name ?? device.device_id,
           prefixElement: <DevicePrefix color={device.device_color} />,
           subText: device.device_enabled ? 'Enabled' : 'Disabled',
-          subTextColor: device.device_enabled ? '#2fa500ff' : '#999',
+          subTextColor: device.device_enabled ? '#2fa500ff' : '#E53935',
           suffixIcon: 'chevron-right',
           onPress: () =>
             router.navigate({
@@ -281,10 +281,10 @@ export default function MapDevicesScreen() {
 
             {!addingDevice && (
               <Pressable
-                style={{ marginTop: 12 }}
+                style={[{ marginTop: 12 }, styles.secondaryButton]}
                 onPress={() => setManualAdd(false)}
               >
-                <Text style={[styles.link, { color: '#ef4444' }]}>Cancel</Text>
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
               </Pressable>
             )}
           </View>
@@ -362,20 +362,30 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    marginTop: 8,
-    height: 48,
-    borderRadius: 12,
     backgroundColor: '#2563EB',
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 12,
   },
-
   primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: '#FFFFFF',
+    fontSize: 18,
     fontWeight: '600',
   },
-
+  secondaryButton: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2563EB',
+  },
+  secondaryButtonText: {
+    color: '#2563EB',
+    fontSize: 18,
+    fontWeight: '600',
+  },
   buttonPressed: {
     opacity: 0.85,
   },
