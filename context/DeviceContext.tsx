@@ -25,7 +25,7 @@ type DeviceContextType = {
 
 const DeviceContext = createContext<DeviceContextType | null>(null);
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE || '{{BASE_URL_LIVE}}';
+const BASE_URL = process.env.EXPO_PRIVATE_API_BASE || '{{BASE_URL_LIVE}}';
 
 export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const { idToken } = useAuth();

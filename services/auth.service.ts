@@ -1,6 +1,6 @@
 import { User } from 'firebase/auth';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
+const API_BASE = process.env.EXPO_PRIVATE_API_BASE;
 
 export type RegisterPayload = {
   first_name: string;
@@ -76,5 +76,3 @@ export async function checkEmailAvailability(email: string): Promise<boolean> {
   // available = NOT exists
   return !data.exists;
 }
-
-

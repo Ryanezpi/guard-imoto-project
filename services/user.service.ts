@@ -1,5 +1,5 @@
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
+import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
+const API_BASE = process.env.EXPO_PRIVATE_API_BASE;
 
 export interface AuditLog {
   id: string;
