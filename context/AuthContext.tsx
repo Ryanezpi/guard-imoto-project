@@ -10,7 +10,7 @@ import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { getMeAPI } from '@/services/user.service';
+import { getMeAPI, updateProfile } from '@/services/user.service';
 import { useLoader } from './LoaderContext';
 import { ROUTES } from '@/constants/routes';
 import { router } from 'expo-router';
@@ -76,14 +76,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /* ---------------------------------- */
   const refreshUser = useCallback(async () => {
     if (!idToken) return null;
+
     try {
       const me = await getMeAPI(idToken);
+      const expoToken = await getStoredExpoToken();
 
-      // Check if we have a stored Expo push token
-      const storedToken = await AsyncStorage.getItem(EXPO_TOKEN_KEY);
-      if (storedToken) {
-        // await updateExpoTokenAPI(storedToken, idToken);
-        me.expo_push_token = storedToken;
+      if (expoToken && me.expo_push_token !== expoToken) {
+        await updateProfile(idToken, {
+          first_name: me.first_name,
+          last_name: me.last_name,
+          phone: me.phone,
+          expo_token: expoToken,
+        });
+
+        me.expo_push_token = expoToken;
       }
 
       setUser(me);
@@ -111,6 +117,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('unauthenticated');
           return;
         }
+        console.log('fbUser.emailVerified', fbUser.emailVerified);
+        const me = await getMeAPI(fbUser ? await fbUser.getIdToken() : '');
+
+        if (!fbUser.emailVerified) {
+          setUser(me);
+          setStatus('unauthenticated');
+          router.replace(ROUTES.AUTH.CREATE_ACCOUNT.EMAIL_VERIFICATION);
+          hideLoader();
+          console.log('User email not verified:', fbUser.email);
+          return; // Do NOT proceed to map
+        }
 
         try {
           const token = await fbUser.getIdToken();
@@ -129,7 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(me);
           setStatus('authenticated');
 
-          router.replace(ROUTES.MAP.ROOT);
+          router.replace(ROUTES.APP.MAP);
           console.log('Authenticated user:', me);
           hideLoader();
           scheduleTokenRefresh();
@@ -177,3 +194,16 @@ export const useAuth = () => {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 };
+
+async function getStoredExpoToken(): Promise<string | null> {
+  try {
+    const token = await AsyncStorage.getItem(EXPO_TOKEN_KEY);
+    if (token) {
+      console.log('[Expo] Push token available:', token);
+      return token;
+    }
+  } catch (err) {
+    console.log('[Expo] Failed to read push token', err);
+  }
+  return null;
+}

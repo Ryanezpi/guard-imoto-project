@@ -35,7 +35,7 @@ export default function Walkthrough() {
 
         <Text style={styles.legalText}>
           By proceeding further, you agree to our
-          <Text style={styles.link}>privacy policy</Text> and provide your
+          <Text style={styles.link}> privacy policy</Text> and provide your
           consent.
         </Text>
       </View>

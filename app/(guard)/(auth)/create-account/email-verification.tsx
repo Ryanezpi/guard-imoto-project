@@ -1,6 +1,7 @@
 import DynamicCard from '@/components/ui/Card';
 import { ROUTES } from '@/constants/routes';
 import { useAuth } from '@/context/AuthContext';
+import { useLoader } from '@/context/LoaderContext';
 import { useTheme } from '@/context/ThemeContext';
 import { auth } from '@/lib/firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,11 +9,13 @@ import { useRouter } from 'expo-router';
 import { sendEmailVerification, signOut } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   StyleSheet,
   Text,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,6 +24,7 @@ export default function EmailVerification() {
   const router = useRouter();
   const { theme } = useTheme();
   const { refreshUser } = useAuth();
+  const { showLoader, hideLoader } = useLoader();
 
   const bgColor = theme === 'light' ? '#ffffff' : '#272727';
   const cardColor = theme === 'light' ? '#ffffff' : '#1f1f1f';
@@ -30,20 +34,24 @@ export default function EmailVerification() {
   const [sending, setSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
   const [showVerifiedButton, setShowVerifiedButton] = useState(false);
-  const [timer, setTimer] = useState(0);
 
   const currentUser = auth.currentUser;
 
-  // Countdown for expiration
   useEffect(() => {
-    if (timer <= 0) {
+    hideLoader();
+  }, [hideLoader]);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (cooldown <= 0) {
       setShowVerifiedButton(false);
       return;
     }
-    const interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
+    const interval = setInterval(() => setCooldown((prev) => prev - 1), 1000);
     return () => clearInterval(interval);
-  }, [timer]);
+  }, [cooldown]);
 
   const handleSendVerification = async () => {
     if (!currentUser) {
@@ -54,6 +62,7 @@ export default function EmailVerification() {
     setSending(true);
     setErrorMessage(null);
     setSuccessMessage(null);
+    showLoader();
 
     try {
       await sendEmailVerification(currentUser);
@@ -61,33 +70,41 @@ export default function EmailVerification() {
         `Verification email sent to ${currentUser.email}. Please check your inbox.`
       );
       setShowVerifiedButton(true);
-      setTimer(120); // 2 minutes countdown
-      console.log('Email verification sent!');
+      setCooldown(180); // 3 minutes cooldown
     } catch (err: any) {
       console.error('Failed to send email verification:', err);
       setErrorMessage('Failed to send email verification. Try again.');
     } finally {
       setSending(false);
+      hideLoader();
     }
   };
 
   const checkVerified = async () => {
     if (!currentUser) return;
 
-    await currentUser.reload();
-    if (currentUser.emailVerified) {
-      console.log('Email verified!');
-
-      // Refresh the backend user to update status
-      const updatedUser = await refreshUser();
-      if (updatedUser) {
-        router.replace('/(guard)/(app)/map');
+    showLoader();
+    try {
+      await currentUser.reload();
+      if (currentUser.emailVerified) {
+        console.log('Email verified!');
+        await refreshUser();
+        router.replace(ROUTES.APP.MAP);
       } else {
-        setErrorMessage('Failed to refresh user, try again.');
+        setErrorMessage('Email not verified yet. Please check your inbox.');
       }
-    } else {
-      setErrorMessage('Email not verified yet. Please check your inbox.');
+    } catch (err: any) {
+      console.error('Error checking verification', err);
+      setErrorMessage('Failed to check verification. Try again.');
+    } finally {
+      hideLoader();
     }
+  };
+
+  const formatTimer = (seconds: number) => {
+    const min = Math.floor(seconds / 60);
+    const sec = seconds % 60;
+    return `${min}:${sec.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -96,71 +113,87 @@ export default function EmailVerification() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[styles.card, { backgroundColor: cardColor }]}>
-          <Text style={[styles.title, { color: textColor }]}>
-            Email Verification
-          </Text>
-          <Text style={[styles.subtitle, { color: subTextColor }]}>
-            A verification email will be sent to your registered email. Please
-            verify to continue.
-          </Text>
-
-          {errorMessage && (
-            <Text style={{ color: 'red', marginBottom: 8 }}>
-              {errorMessage}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={[styles.card, { backgroundColor: cardColor }]}>
+            <Text style={[styles.title, { color: textColor }]}>
+              Email Verification
             </Text>
-          )}
-          {successMessage && (
-            <Text style={{ color: 'green', marginBottom: 8 }}>
-              {successMessage}
+            <Text style={[styles.subtitle, { color: subTextColor }]}>
+              A verification email will be sent to your registered email. Please
+              verify to continue.
             </Text>
-          )}
-          {!showVerifiedButton && (
+            {errorMessage && (
+              <Text style={{ color: 'red', marginBottom: 8 }}>
+                {errorMessage}
+              </Text>
+            )}
+            {successMessage && (
+              <Text style={{ color: 'green', marginBottom: 8 }}>
+                {successMessage}
+              </Text>
+            )}
+            {/* Send verification button */}
             <Pressable
-              style={[styles.primaryButton, { opacity: sending ? 0.5 : 1 }]}
-              disabled={sending}
+              style={[
+                styles.primaryButton,
+                { opacity: sending || cooldown > 0 ? 0.5 : 1 },
+              ]}
+              disabled={sending || cooldown > 0}
               onPress={handleSendVerification}
             >
               <Text style={styles.primaryButtonText}>
-                {sending ? 'Sending…' : 'Send Verification Email'}
+                {sending
+                  ? 'Sending…'
+                  : cooldown > 0
+                    ? `Resend available in ${formatTimer(cooldown)}`
+                    : 'Send Verification Email'}
               </Text>
             </Pressable>
-          )}
-          {showVerifiedButton && (
-            <Pressable
-              style={[styles.primaryButton, { marginTop: 12 }]}
-              onPress={checkVerified}
-            >
-              <Text style={styles.primaryButtonText}>I Verified My Email</Text>
-            </Pressable>
-          )}
-        </View>
+            {/* "I Verified My Email" button */}
+            {showVerifiedButton && (
+              <Pressable
+                style={[styles.primaryButton, { marginTop: 12 }]}
+                onPress={checkVerified}
+              >
+                <Text style={styles.primaryButtonText}>
+                  I Verified My Email
+                </Text>
+              </Pressable>
+            )}
 
-        {/* Logout at the bottom */}
-        <View style={[styles.logoutContainer, { backgroundColor: cardColor }]}>
-          <DynamicCard
-            key={theme + 'logout'}
-            name="Logout"
-            prefixIcon="sign-out"
-            prefixColor="#ff4d4f"
-            onPress={async () => {
-              try {
-                await signOut(auth);
-                await AsyncStorage.multiRemove(['theme', 'onboardingSeen']);
-                router.replace(ROUTES.AUTH.LOGIN);
-              } catch (err) {
-                console.error('Logout failed', err);
-              }
-            }}
-          />
-        </View>
+            {/* Logout */}
+            <View
+              style={[styles.logoutContainer, { backgroundColor: cardColor }]}
+            >
+              <DynamicCard
+                key={theme + 'logout'}
+                name="Logout"
+                prefixIcon="sign-out"
+                prefixColor="#ff4d4f"
+                onPress={async () => {
+                  try {
+                    await signOut(auth);
+                    await AsyncStorage.multiRemove(['theme', 'onboardingSeen']);
+                    router.replace(ROUTES.AUTH.LOGIN);
+                  } catch (err) {
+                    console.error('Logout failed', err);
+                  }
+                }}
+              />
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { flex: 1, marginHorizontal: 20, borderRadius: 20, padding: 24 },
+  card: {
+    display: 'flex',
+    padding: 24,
+    flex: 1,
+  },
   title: { fontSize: 26, fontWeight: '700' },
   subtitle: { fontSize: 15, marginTop: 4, marginBottom: 28 },
   primaryButton: {
@@ -172,8 +205,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   logoutContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    justifyContent: 'flex-end',
+    marginTop: 64,
   },
 });

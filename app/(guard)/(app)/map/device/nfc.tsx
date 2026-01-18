@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  Button,
   TextInput,
   ScrollView,
   ActivityIndicator,
@@ -11,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/ThemeContext';
-import AddDeviceCard from '@/components/ui/AddDeviceCard';
+// import AddDeviceCard from '@/components/ui/AddDeviceCard';
 import HelperBox from '@/components/ui/HelperBoxProps';
 import { useGlobalSearchParams } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -21,10 +20,12 @@ import {
   unlinkNFC,
   type NFCItem,
 } from '@/services/user.service';
+import { useLoader } from '@/context/LoaderContext';
 
 export default function DeviceNFCCardScreen() {
   const { theme } = useTheme();
   const { idToken } = useAuth();
+  const { showLoader, hideLoader } = useLoader();
 
   const bgColor = theme === 'light' ? '#f0f0f0' : '#272727';
   const textColor = theme === 'light' ? '#000' : '#fff';
@@ -34,35 +35,37 @@ export default function DeviceNFCCardScreen() {
   const deviceColor = params.device_color ?? '#2fa500';
 
   const [loading, setLoading] = useState(true);
-  const [nfc, setNfc] = useState<NFCItem | null>(null); // single NFC
+  const [nfcs, setNfcs] = useState<NFCItem[]>([]);
   const [manualInput, setManualInput] = useState('');
   const [linking, setLinking] = useState(false);
 
-  const fetchNFC = useCallback(async () => {
+  const fetchNFCs = useCallback(async () => {
     if (!deviceId) return;
     try {
       setLoading(true);
+      showLoader();
       const res = await getDeviceNFCs(idToken!, deviceId);
-      setNfc(res && res.length > 0 ? res[0] : null); // take the first (only) tag
+      setNfcs(res ?? []);
     } catch (e: any) {
-      console.error('Failed to fetch NFC', e);
-      Alert.alert('Error', `Failed to fetch NFC: ${e.message || e}`);
-      setNfc(null);
+      console.error('Failed to fetch NFCs', e);
+      Alert.alert('Error', `Failed to fetch NFCs: ${e.message || e}`);
+      setNfcs([]);
     } finally {
       setLoading(false);
+      hideLoader();
     }
-  }, [deviceId, idToken]);
+  }, [deviceId, hideLoader, idToken, showLoader]);
 
   useEffect(() => {
-    fetchNFC();
-  }, [fetchNFC]);
+    fetchNFCs();
+  }, [fetchNFCs]);
 
   const handleLinkNFC = async (nfcId: string) => {
     if (!nfcId) return;
     try {
       setLinking(true);
       await linkNFC(idToken!, deviceId, nfcId);
-      await fetchNFC();
+      await fetchNFCs();
       setManualInput('');
     } catch (e: any) {
       console.error('Failed to link NFC', e);
@@ -72,15 +75,32 @@ export default function DeviceNFCCardScreen() {
     }
   };
 
-  const handleUnlinkNFC = async (nfcId: string) => {
+  const handleUnlinkNFC = async (tagUid: string) => {
     try {
-      await unlinkNFC(idToken!, nfcId);
-      setNfc(null);
+      showLoader();
+      await unlinkNFC(idToken!, tagUid);
+
+      // optimistic UI update
+      setNfcs((prev) => prev.filter((n) => n.tag_uid !== tagUid));
     } catch (e: any) {
       console.error('Failed to unlink NFC', e);
       Alert.alert('Error', `Failed to unlink NFC: ${e.message || e}`);
+    } finally {
+      hideLoader();
     }
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
+        <View
+          style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+        >
+          <ActivityIndicator size="large" color={deviceColor} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -88,97 +108,84 @@ export default function DeviceNFCCardScreen() {
       edges={['bottom', 'left', 'right']}
     >
       <ScrollView contentContainerStyle={{ padding: 16 }}>
-        {loading ? (
-          <ActivityIndicator size="large" color={deviceColor} />
-        ) : nfc ? (
-          // Show existing NFC
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: '#ccc',
-              borderRadius: 8,
-              padding: 16,
-              marginVertical: 6,
-              backgroundColor: theme === 'light' ? '#fff' : '#1f1f1f',
-            }}
-          >
-            <Text style={{ fontWeight: 'bold', color: textColor }}>
-              Tag UID: {nfc.tag_uid}
-            </Text>
-            <Text style={{ color: textColor }}>ID: {nfc.id}</Text>
-            <Text style={{ color: textColor }}>
-              Paired At:
-              {nfc.paired_at ? new Date(nfc.paired_at).toLocaleString() : 'N/A'}
-            </Text>
-            <Button
-              title="Unlink"
-              color="#ff4d4f"
-              onPress={() => handleUnlinkNFC(nfc.tag_uid!)}
-            />
-          </View>
-        ) : (
-          <>
-            {/* Add NFC */}
-            <AddDeviceCard
-              label={`Link NFC to Device`}
-              onPress={() => {
-                if (manualInput) {
-                  handleLinkNFC(manualInput);
-                } else {
-                  Alert.alert(
-                    'Info',
-                    'Scan an NFC with your phone reader or enter manually.'
-                  );
-                }
-              }}
-            />
-            <HelperBox text="After tapping 'Add NFC', tap your card to the device to link. Wait a few seconds for it to register." />
-
-            {/* Manual Input */}
-            <View
-              style={{ flexDirection: 'column', gap: 12, marginVertical: 12 }}
-            >
-              <TextInput
-                placeholder="Or enter NFC ID manually"
-                value={manualInput}
-                onChangeText={setManualInput}
-                placeholderTextColor={textColor}
+        {nfcs.length > 0 && (
+          <View style={{ gap: 12 }}>
+            {nfcs.map((nfc) => (
+              <View
+                key={nfc.id}
                 style={{
                   borderWidth: 1,
                   borderColor: '#ccc',
                   borderRadius: 8,
-                  padding: 12,
-                  color: textColor,
+                  padding: 16,
                   backgroundColor: theme === 'light' ? '#fff' : '#1f1f1f',
                 }}
-              />
-
-              {/* Styled Manual Link Button */}
-              <Pressable
-                onPress={() => handleLinkNFC(manualInput)}
-                disabled={!manualInput || linking}
-                style={({ pressed }) => [
-                  {
-                    marginTop: 12,
-                    height: 52,
-                    borderRadius: 14,
-                    backgroundColor: '#2563EB',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: pressed ? 0.9 : 1,
-                  },
-                  (!manualInput || linking) && { opacity: 0.6 },
-                ]}
               >
-                <Text
-                  style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}
-                >
-                  {linking ? 'Linking...' : 'Link NFC manually'}
+                <Text style={{ fontWeight: 'bold', color: textColor }}>
+                  Tag UID: {nfc.tag_uid}
                 </Text>
-              </Pressable>
-            </View>
-          </>
+                <Text style={{ color: textColor }}>ID: {nfc.id}</Text>
+                <Text style={{ color: textColor }}>
+                  Paired At:{' '}
+                  {nfc.paired_at
+                    ? new Date(nfc.paired_at).toLocaleString()
+                    : 'N/A'}
+                </Text>
+
+                <Pressable
+                  onPress={() => handleUnlinkNFC(nfc.tag_uid!)}
+                  style={{
+                    marginTop: 12,
+                    paddingVertical: 14,
+                    borderRadius: 10,
+                    alignItems: 'center',
+                    backgroundColor: '#ff4d4f',
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '600' }}>
+                    Unlink NFC
+                  </Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
         )}
+
+        {/* Add NFC */}
+        <View style={{ marginTop: 24, gap: 12 }}>
+          <TextInput
+            placeholder="Enter NFC ID manually"
+            value={manualInput}
+            onChangeText={setManualInput}
+            placeholderTextColor={textColor}
+            style={{
+              borderWidth: 1,
+              borderColor: '#ccc',
+              borderRadius: 8,
+              padding: 12,
+              color: textColor,
+              backgroundColor: theme === 'light' ? '#fff' : '#1f1f1f',
+            }}
+          />
+
+          <HelperBox text="You can link multiple NFC tags to this device." />
+
+          <Pressable
+            onPress={() => handleLinkNFC(manualInput)}
+            disabled={!manualInput || linking}
+            style={{
+              paddingVertical: 16,
+              borderRadius: 12,
+              alignItems: 'center',
+              backgroundColor: '#2563EB',
+              opacity: !manualInput || linking ? 0.6 : 1,
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
+              {linking ? 'Linking...' : 'Link another NFC'}
+            </Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

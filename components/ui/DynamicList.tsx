@@ -110,27 +110,30 @@ export default function DynamicList({
       .slice()
       // 🔹 latest items first
       .sort((a, b) => b.date!.getTime() - a.date!.getTime())
-      .reduce((acc, item) => {
-        const dateKey = getLocalDateKey(item.date!);
+      .reduce(
+        (acc, item) => {
+          const dateKey = getLocalDateKey(item.date!);
 
-        if (!acc[dateKey]) {
-          acc[dateKey] = {
-            dateKey,
-            label: isToday(item.date!)
-              ? 'Today'
-              : item.date!.toLocaleDateString(undefined, {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                }),
-            data: [],
-          };
-        }
+          if (!acc[dateKey]) {
+            acc[dateKey] = {
+              dateKey,
+              label: isToday(item.date!)
+                ? 'Today'
+                : item.date!.toLocaleDateString(undefined, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  }),
+              data: [],
+            };
+          }
 
-        acc[dateKey].data.push(item);
-        return acc;
-      }, {} as Record<string, GroupedItems>)
+          acc[dateKey].data.push(item);
+          return acc;
+        },
+        {} as Record<string, GroupedItems>
+      )
   );
 
   return (

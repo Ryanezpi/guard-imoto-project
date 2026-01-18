@@ -64,6 +64,7 @@ export async function updateProfile(
     last_name: string;
     phone: string;
     photo_url?: string;
+    expo_token?: string | null;
   }
 ) {
   const res = await fetch(`${API_BASE}/users/me`, {
@@ -334,4 +335,20 @@ export async function patchDeviceAlarm(
   }
 
   return res.json();
+}
+
+export async function getMyAlerts(token: string) {
+  const res = await fetch(`${API_BASE}/alerts`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || 'Failed to fetch alerts');
+  }
+
+  return res.json(); // { success, alerts }
 }

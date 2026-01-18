@@ -24,7 +24,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function Login() {
   const router = useRouter();
   const { theme } = useTheme();
-  const { showLoader } = useLoader();
+  const { showLoader, hideLoader } = useLoader();
   const passwordRef = useRef<TextInput>(null);
 
   const bgColor = theme === 'light' ? '#ffffff' : '#272727';
@@ -45,6 +45,7 @@ export default function Login() {
       setSecure(true);
       await signInWithEmailAndPassword(auth, email.trim(), password);
     } catch (e: any) {
+      hideLoader();
       alert(e.message);
     } finally {
       setLoading(false);
@@ -74,11 +75,9 @@ export default function Login() {
             {/* Card */}
             <View style={[styles.card, { backgroundColor: cardColor }]}>
               {/* ⬇️ everything else stays exactly the same ⬇️ */}
-              <Text style={[styles.title, { color: textColor }]}>
-                Welcome back
-              </Text>
+              <Text style={[styles.title, { color: textColor }]}>Login</Text>
               <Text style={[styles.subtitle, { color: subTextColor }]}>
-                Login to continue
+                Enter your email and password to continue
               </Text>
 
               {/* Email */}
@@ -161,7 +160,7 @@ export default function Login() {
               >
                 <Text style={styles.link}>
                   Don&apos;t have an account?
-                  <Text style={styles.linkBold}>Create one</Text>
+                  <Text style={styles.linkBold}> Create one</Text>
                 </Text>
               </Pressable>
             </View>

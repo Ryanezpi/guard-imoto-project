@@ -19,6 +19,7 @@ import {
   View,
   Text,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -40,12 +41,10 @@ type DeviceState = {
     gps: boolean;
   };
 
-  alerts: {
-    sms: boolean;
-    vibration: boolean;
-    movement: boolean;
-    tremors: boolean;
-  };
+  sms_alerts_enabled: boolean;
+  rfid_alerts: boolean;
+  gps_alerts: boolean;
+  gyro_alerts: boolean;
 
   relays: {
     siren: {
@@ -73,12 +72,10 @@ function mapApiDeviceToState(api: any): DeviceState {
       gps: api.gps_enabled ?? false,
     },
 
-    alerts: {
-      sms: api.sms_alerts_enabled ?? false,
-      vibration: api.vibration ?? false,
-      movement: api.movement ?? false,
-      tremors: api.tremors ?? false,
-    },
+    sms_alerts_enabled: api.sms_alerts_enabled ?? true,
+    gps_alerts: api.gps_alerts ?? true,
+    gyro_alerts: api.gyro_alerts ?? true,
+    rfid_alerts: api.rfid_alerts ?? true,
 
     relays: {
       siren: {
@@ -126,10 +123,10 @@ function mapStateToPatchConfig(state: DeviceState) {
     relay2_enabled: state.relays.ignition,
     relay2_override: state.relays.relay2_override,
 
-    sms_alerts_enabled: state.alerts.sms,
-    vibration: state.alerts.vibration,
-    movement: state.alerts.movement,
-    tremors: state.alerts.tremors,
+    sms_alerts_enabled: state.sms_alerts_enabled,
+    gyro_alerts: state.gyro_alerts,
+    gps_alerts: state.gps_alerts,
+    rfid_alerts: state.rfid_alerts,
   };
 }
 
@@ -147,9 +144,10 @@ export default function DeviceSettingsScreen() {
 
   const { devices } = useDevices();
   const [readMode, setReadMode] = useState<'realtime' | 'interval'>('interval');
-  const [intervalSec, setIntervalSec] = useState(60);
+  const [intervalSec] = useState(60);
   const [device, setDevice] = useState<DeviceState | null>(null);
   const [draft, setDraft] = useState<DeviceState | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [showEditModal, setShowEditModal] = useState(false);
 
@@ -160,6 +158,15 @@ export default function DeviceSettingsScreen() {
   const openEditModal = () => {
     setDraft(structuredClone(device));
     setShowEditModal(true);
+  };
+
+  const onRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await refreshDevices();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   function diffPatch(
@@ -183,7 +190,14 @@ export default function DeviceSettingsScreen() {
     addIfChanged('gps_enabled', prev.sensors.gps, next.sensors.gps);
 
     // Alerts
-    addIfChanged('sms_alerts_enabled', prev.alerts.sms, next.alerts.sms);
+    addIfChanged(
+      'sms_alerts_enabled',
+      prev.sms_alerts_enabled,
+      next.sms_alerts_enabled
+    );
+    addIfChanged('gps_alerts', prev.gps_alerts, next.gps_alerts);
+    addIfChanged('gyro_alerts', prev.gyro_alerts, next.gyro_alerts);
+    addIfChanged('rfid_alerts', prev.rfid_alerts, next.rfid_alerts);
 
     // Relay 1
     addIfChanged(
@@ -232,7 +246,7 @@ export default function DeviceSettingsScreen() {
   }
 
   useEffect(() => {
-    if (!devices || !deviceId || device) return; // only run if device is not yet loaded
+    if (!devices || !deviceId) return;
 
     const apiDevice = devices.find((d) => d.device_id === deviceId);
     if (!apiDevice) return;
@@ -240,7 +254,7 @@ export default function DeviceSettingsScreen() {
     const mapped = mapApiDeviceToState(apiDevice);
     setDevice(mapped);
     setDraft(mapped);
-  }, [devices, deviceId, device]);
+  }, [devices, deviceId]);
 
   const updateAndSync = (updater: (d: DeviceState) => DeviceState) => {
     setDevice((prev) => {
@@ -266,28 +280,23 @@ export default function DeviceSettingsScreen() {
     });
   };
   useEffect(() => {
-    let subscription: any;
+    if (readMode !== 'realtime' || !device?.pubnub_channel) return;
 
-    if (readMode === 'realtime') {
-      // subscribe to PubNub channel for this device
-      subscription = pubnub.subscribe({
-        channels: [device?.pubnub_channel!],
-      });
-      console.log('Device pubnub_channel:', device?.pubnub_channel);
-      console.log('Device ID:', deviceId);
+    const listener = {
+      message: async () => {
+        await refreshDevices();
+      },
+    };
 
-      pubnub.addListener({
-        message: (msg) => {
-          console.log('Realtime device data:', msg.message);
-          // update device state here
-        },
-      });
-    }
+    pubnub.addListener(listener);
+    pubnub.subscribe({ channels: [device.pubnub_channel] });
 
     return () => {
-      if (subscription) pubnub.unsubscribeAll();
+      pubnub.removeListener(listener);
+      pubnub.unsubscribe({ channels: [device.pubnub_channel!] });
     };
-  }, [readMode, deviceId, device?.pubnub_channel]);
+  }, [readMode, device?.pubnub_channel, refreshDevices]);
+
   useEffect(() => {
     if (readMode !== 'interval') return;
 
@@ -295,8 +304,8 @@ export default function DeviceSettingsScreen() {
       if (!idToken || !deviceId) return;
 
       try {
-        // const data = await getDeviceDataAPI(idToken, deviceId);
-        // console.log('Interval device data:', data);
+        await refreshDevices();
+        console.log('Interval device data Refreshed');
         // update device state here
       } catch (err) {
         console.error('Failed to fetch interval data', err);
@@ -304,7 +313,7 @@ export default function DeviceSettingsScreen() {
     }, intervalSec * 1000);
 
     return () => clearInterval(interval);
-  }, [readMode, intervalSec, deviceId, idToken]);
+  }, [readMode, intervalSec, deviceId, idToken, refreshDevices]);
 
   if (!device || !draft) {
     return (
@@ -331,8 +340,6 @@ export default function DeviceSettingsScreen() {
           try {
             showLoader();
             const payload = mapStateToPatchConfig(draft);
-            console.log(payload);
-
             await patchDeviceConfig(idToken!, deviceId!, payload);
             await refreshDevices().then(hideLoader);
 
@@ -426,7 +433,16 @@ export default function DeviceSettingsScreen() {
         />
       </ConfirmModal>
 
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
+      <ScrollView
+        contentContainerStyle={{ padding: 16 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme === 'light' ? '#000' : '#fff'}
+          />
+        }
+      >
         <TitleSection
           title="Data Read Mode"
           subtitle="Choose how the device data is fetched."
@@ -501,16 +517,6 @@ export default function DeviceSettingsScreen() {
           />
 
           <DynamicCard
-            name="SMS Alerts"
-            prefixIcon="envelope"
-            toggle
-            toggleValue={device.alerts.sms}
-            onToggle={(v) =>
-              updateAndSync((d) => ({ ...d, alerts: { ...d.alerts, sms: v } }))
-            }
-          />
-
-          <DynamicCard
             name="Relay Channel 1 (Siren)"
             prefixIcon="bullhorn"
             toggle
@@ -547,33 +553,44 @@ export default function DeviceSettingsScreen() {
           title="Alerts"
           subtitle="Configure when and how you are notified."
         >
-          {(['vibration', 'movement', 'tremors'] as const).map((key) => (
-            <DynamicCard
-              key={key}
-              name={
-                key === 'vibration'
-                  ? 'Vibration Alerts'
-                  : key === 'movement'
-                  ? 'Movement Detection'
-                  : 'Repeated Tremors'
-              }
-              prefixIcon={
-                key === 'vibration'
-                  ? 'exclamation-triangle'
-                  : key === 'movement'
-                  ? 'arrows'
-                  : 'warning'
-              }
-              toggle
-              toggleValue={device.alerts[key]}
-              onToggle={(v) =>
-                updateAndSync((d) => ({
-                  ...d,
-                  alerts: { ...d.alerts, [key]: v },
-                }))
-              }
-            />
-          ))}
+          {(['gyro_alerts', 'gps_alerts', 'rfid_alerts'] as const).map(
+            (key) => (
+              <DynamicCard
+                key={key}
+                name={
+                  key === 'rfid_alerts'
+                    ? 'RFID Alerts'
+                    : key === 'gps_alerts'
+                      ? 'GPS Alerts'
+                      : 'Gyro Alerts'
+                }
+                prefixIcon={
+                  key === 'rfid_alerts'
+                    ? 'warning'
+                    : key === 'gps_alerts'
+                      ? 'map'
+                      : 'arrows'
+                }
+                toggle
+                toggleValue={device[key]}
+                onToggle={(v) =>
+                  updateAndSync((d) => ({
+                    ...d,
+                    [key]: v, // directly update flat field
+                  }))
+                }
+              />
+            )
+          )}
+          <DynamicCard
+            name="SMS Alerts"
+            prefixIcon="envelope"
+            toggle
+            toggleValue={device.sms_alerts_enabled}
+            onToggle={(v) =>
+              updateAndSync((d) => ({ ...d, sms_alerts_enabled: v }))
+            }
+          />
         </TitleSection>
 
         {/* OVERRIDE / TESTING */}
@@ -594,58 +611,6 @@ export default function DeviceSettingsScreen() {
                 },
               })
             }
-          />
-
-          <DynamicCard
-            name="Test Siren Relay"
-            prefixIcon="bullhorn"
-            toggle
-            toggleValue={device.relays.relay1_override}
-            onToggle={async (v) => {
-              updateAndSync((d) => ({
-                ...d,
-                relays: { ...d.relays, relay1_override: v },
-              }));
-              try {
-                if (v) {
-                  // await testRelay(deviceId, 'siren_on');
-                } else {
-                  // await testRelay(deviceId, 'siren_off');
-                }
-              } catch (e) {
-                Alert.alert('Error', `Failed to test siren relay: ${e}`);
-                updateAndSync((d) => ({
-                  ...d,
-                  relays: { ...d.relays, relay1_override: !v },
-                }));
-              }
-            }}
-          />
-
-          <DynamicCard
-            name="Test Ignition Relay"
-            prefixIcon="bolt"
-            toggle
-            toggleValue={device.relays.relay2_override}
-            onToggle={async (v) => {
-              updateAndSync((d) => ({
-                ...d,
-                relays: { ...d.relays, relay2_override: v },
-              }));
-              try {
-                if (v) {
-                  // await testRelay(deviceId, 'ignition_on');
-                } else {
-                  // await testRelay(deviceId, 'ignition_off');
-                }
-              } catch (e) {
-                Alert.alert('Error', `Failed to test ignition relay: ${e}`);
-                updateAndSync((d) => ({
-                  ...d,
-                  relays: { ...d.relays, relay2_override: !v },
-                }));
-              }
-            }}
           />
         </TitleSection>
 

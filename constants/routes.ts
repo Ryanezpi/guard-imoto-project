@@ -22,7 +22,7 @@ export const ROUTES = {
       ROOT: '/(guard)/(auth)/create-account',
       USER_DETAILS: '/(guard)/(auth)/create-account/user-details',
       PASSWORD: '/(guard)/(auth)/create-account/password',
-      PHONE_VERIFICATION: '/(guard)/(auth)/create-account/phone-verification',
+      EMAIL_VERIFICATION: '/(guard)/(auth)/create-account/email-verification',
     },
   },
 

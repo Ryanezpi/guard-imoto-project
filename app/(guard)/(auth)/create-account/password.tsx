@@ -1,6 +1,9 @@
+import { ROUTES } from '@/constants/routes';
+import { useLoader } from '@/context/LoaderContext';
 import { useTheme } from '@/context/ThemeContext';
 import { auth } from '@/lib/firebase';
 import { registerUserWithBackend } from '@/services/auth.service';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useEffect, useState } from 'react';
@@ -8,10 +11,16 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function PasswordStep() {
-  const params = useLocalSearchParams();
+  const params = useLocalSearchParams<{
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+  }>();
+
   const router = useRouter();
   const { theme } = useTheme();
-
+  const { showLoader, hideLoader } = useLoader();
   const bgColor = theme === 'light' ? '#ffffff' : '#272727';
   const cardColor = theme === 'light' ? '#ffffff' : '#1f1f1f';
   const textColor = theme === 'light' ? '#111827' : '#f9fafb';
@@ -33,15 +42,11 @@ export default function PasswordStep() {
   }, [password, confirm]);
 
   const next = async () => {
-    router.push('/(guard)/(auth)/create-account/email-verification');
-
-    if (!isValid) return;
+    if (!isValid || loading) return;
 
     try {
       setLoading(true);
-
-      setLoading(true);
-
+      showLoader();
       const res = await createUserWithEmailAndPassword(
         auth,
         params.email as string,
@@ -53,12 +58,13 @@ export default function PasswordStep() {
         last_name: params.lastName as string,
         phone: params.phone as string,
       });
-
-      router.push('/(guard)/(auth)/create-account/email-verification');
+      hideLoader();
+      router.replace(ROUTES.AUTH.CREATE_ACCOUNT.EMAIL_VERIFICATION);
     } catch (e: any) {
       alert(e.message);
     } finally {
       setLoading(false);
+      hideLoader();
     }
   };
 
@@ -84,7 +90,13 @@ export default function PasswordStep() {
               onBlur={() => setSecure1(true)}
             />
             <Pressable onPress={() => setSecure1(!secure1)}>
-              <Text style={styles.toggle}>{secure1 ? 'Show' : 'Hide'}</Text>
+              <Text style={styles.toggle}>
+                {secure1 ? (
+                  <FontAwesome name="eye" size={18} color="#8E8E93" />
+                ) : (
+                  <FontAwesome name="eye-slash" size={18} color="#8E8E93" />
+                )}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -105,20 +117,32 @@ export default function PasswordStep() {
               onBlur={() => setSecure2(true)}
             />
             <Pressable onPress={() => setSecure2(!secure2)}>
-              <Text style={styles.toggle}>{secure2 ? 'Show' : 'Hide'}</Text>
+              <Text style={styles.toggle}>
+                {secure2 ? (
+                  <FontAwesome name="eye" size={18} color="#8E8E93" />
+                ) : (
+                  <FontAwesome name="eye-slash" size={18} color="#8E8E93" />
+                )}
+              </Text>
             </Pressable>
           </View>
         </View>
 
         {/* Continue Button */}
         <Pressable
-          style={[styles.primaryButton, { opacity: isValid ? 1 : 0.5 }]}
+          style={[
+            styles.primaryButton,
+            { opacity: isValid && !loading ? 1 : 0.5 },
+          ]}
           onPress={next}
           disabled={!isValid || loading}
         >
           <Text style={styles.primaryButtonText}>
             {loading ? 'Creating…' : 'Continue'}
           </Text>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={() => router.back()}>
+          <Text style={styles.secondaryButtonText}>Return</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -132,9 +156,9 @@ const styles = StyleSheet.create({
 
   card: {
     flex: 1,
+    paddingTop: 32,
     marginHorizontal: 20,
     borderRadius: 20,
-    padding: 24,
   },
 
   title: {
@@ -180,17 +204,29 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    marginTop: 16,
-    height: 52,
-    borderRadius: 14,
     backgroundColor: '#2563EB',
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
   },
 
-  primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
+  secondaryButton: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2563EB',
+  },
+  secondaryButtonText: {
+    color: '#2563EB',
+    fontSize: 18,
     fontWeight: '600',
   },
 });

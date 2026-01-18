@@ -81,14 +81,22 @@ export default function MapDashboard() {
           pitchEnabled={false}
           customMapStyle={mapStyle}
         >
-          <Marker
-            coordinate={{
-              latitude: userLocation?.latitude || 0 + 1,
-              longitude: userLocation?.longitude || 0 + 1,
-            }}
-            title="My Motorcycle"
-            description="Parked at Home"
-          ></Marker>
+          {/* Device markers */}
+          {devices?.map((device) => {
+            const lat = parseFloat(device.latest_lat);
+            const lng = parseFloat(device.latest_lng);
+            if (!lat || !lng) return null; // skip devices without location
+
+            return (
+              <Marker
+                key={device.device_id}
+                coordinate={{ latitude: lat, longitude: lng }}
+                title={device.device_name + ' - ' + device.serial_number}
+                description={`Last seen at: ${new Date(device.last_seen_at).toDateString()} - ${new Date(device.last_seen_at).toLocaleTimeString()}`}
+                pinColor={device.device_color || 'red'}
+              />
+            );
+          })}
         </MapView>
       ) : (
         <View style={styles.loader}>

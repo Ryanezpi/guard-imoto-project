@@ -1,6 +1,6 @@
 import DynamicCard from '@/components/ui/Card';
 import TitleSection from '@/components/ui/TitleSection';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import { ScrollView, View, Alert } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,9 +13,11 @@ import * as Clipboard from 'expo-clipboard';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import * as Linking from 'expo-linking';
+import { useAuth } from '@/context/AuthContext';
 
 export default function SettingsScreen() {
   const { theme, toggleTheme } = useTheme();
+  const { logout } = useAuth();
   const [pushNotificationsEnabled, setPushNotificationsEnabled] =
     useState(false);
   useEffect(() => {
@@ -190,6 +192,7 @@ export default function SettingsScreen() {
             onPress={async () => {
               try {
                 await signOut(auth);
+                await logout();
                 await AsyncStorage.multiRemove(['theme', 'onboardingSeen']);
                 router.replace(ROUTES.AUTH.LOGIN);
               } catch (err) {
