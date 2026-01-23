@@ -1,38 +1,117 @@
-import DynamicCard from '@/components/ui/Card';
-import { ROUTES } from '@/constants/routes';
-import { useTheme } from '@/context/ThemeContext';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, ActivityIndicator, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, Region } from 'react-native-maps';
+import MapView, { Region, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { useDevices } from '@/context/DeviceContext';
-import { useLoader } from '@/context/LoaderContext';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { Device, useDevices } from '@/context/DeviceContext';
+import { useLoader } from '@/context/LoaderContext';
+import { useTheme } from '@/context/ThemeContext';
+import DynamicCard from '@/components/ui/Card';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { ROUTES } from '@/constants/routes';
+import DeviceDetailsModal from '@/components/ui/DeviceDetailsModal';
+import CustomDeviceMarker from '@/components/ui/PinMarker';
+
+const POLL_INTERVAL_MS = 60000;
 
 export default function MapDashboard() {
   const { hideLoader } = useLoader();
-  const router = useRouter();
   const { theme } = useTheme();
-  const { devices, loading } = useDevices();
+  const { devices: contextDevices, refreshDevices } = useDevices();
+  const router = useRouter();
+  const { focusDeviceId } = useLocalSearchParams<{ focusDeviceId?: string }>();
 
   const mapRef = useRef<MapView>(null);
+  const devicesByIdRef = useRef<Map<string, Device>>(new Map());
+  const lastHashRef = useRef<number>(0);
+  const pollRef = useRef<NodeJS.Timeout | null | any>(null);
+
   const [region, setRegion] = useState<Region | null>(null);
-  const [userLocation, setUserLocation] = useState<Region | null>(null); // store current location
+  const [userLocation, setUserLocation] = useState<Region | null>(null);
+  const [positions, setPositions] = useState<
+    Record<string, { lat: number; lng: number }>
+  >({});
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [detailsVisible, setDetailsVisible] = useState(false);
 
-  const bottomBg = theme === 'light' ? '#f0f0f0' : '#272727';
-
-  /* ---------------------------------- */
-  /* Get current location               */
-  /* ---------------------------------- */
+  /* ------------------ Focus device from navigation ------------------ */
   useEffect(() => {
+    if (!focusDeviceId || !mapRef.current) return;
+
+    const device = devicesByIdRef.current.get(focusDeviceId);
+    if (!device) return;
+
+    const lat = Number(device.latest_lat);
+    const lng = Number(device.latest_lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    mapRef.current.animateToRegion(
+      {
+        latitude: lat,
+        longitude: lng,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      },
+      600
+    );
+
+    setSelectedDevice(device);
+    setDetailsVisible(true);
+  }, [focusDeviceId]);
+
+  /* ------------------ Build positions cache (VERY optimized) ------------------ */
+  useEffect(() => {
+    if (!contextDevices?.length) return;
+
+    const newPositions: Record<string, { lat: number; lng: number }> = {};
+    let hash = 0;
+
+    for (const d of contextDevices) {
+      const lat = Number(d.latest_lat);
+      const lng = Number(d.latest_lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+      newPositions[d.device_id] = { lat, lng };
+      devicesByIdRef.current.set(d.device_id, d);
+
+      hash = ((hash << 5) - hash + lat * 1000 + lng * 1000) | 0;
+    }
+
+    if (hash !== lastHashRef.current) {
+      lastHashRef.current = hash;
+      setPositions(newPositions);
+    }
+  }, [contextDevices]);
+
+  /* ------------------ Stable polling (no memory leaks) ------------------ */
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🟢 Map screen focused — polling started');
+
+      refreshDevices(); // run immediately when returning
+      pollRef.current = setInterval(refreshDevices, POLL_INTERVAL_MS);
+
+      return () => {
+        console.log('🔴 Map screen unfocused — polling stopped');
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      };
+    }, [refreshDevices])
+  );
+
+  /* ------------------ User GPS (run once) ------------------ */
+  useEffect(() => {
+    let mounted = true;
+
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
+      if (status !== 'granted' || !mounted) return;
 
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+        accuracy: Location.Accuracy.Balanced, // ⚡ less memory & battery
       });
 
       const userRegion: Region = {
@@ -43,22 +122,49 @@ export default function MapDashboard() {
       };
 
       setRegion(userRegion);
-      setUserLocation(userRegion); // save initial location
+      setUserLocation(userRegion);
       hideLoader();
     })();
+
+    return () => {
+      mounted = false;
+    };
   }, [hideLoader]);
 
-  const getDeviceText = () => {
-    if (loading) return 'Loading...';
-    if (!devices || devices.length === 0) return 'No devices, add one';
-    return `${devices.length} device${devices.length > 1 ? 's' : ''}`;
-  };
-
-  const goToHome = () => {
+  /* ------------------ Handlers (memoized) ------------------ */
+  const goToHome = useCallback(() => {
     if (userLocation && mapRef.current) {
-      mapRef.current.animateToRegion(userLocation, 500); // smooth 1s animation
+      mapRef.current.animateToRegion(userLocation, 500);
     }
-  };
+  }, [userLocation]);
+
+  const handleSelectDevice = useCallback((d: Device) => {
+    setSelectedDevice(d);
+    setDetailsVisible(true);
+  }, []);
+
+  const handleMapPress = useCallback((e: MapPressEvent) => {
+    console.log('Debug tap coords:', e.nativeEvent.coordinate);
+  }, []);
+
+  /* ------------------ Device Markers (super lightweight) ------------------ */
+  const DeviceMarkers = memo(() => {
+    return Object.entries(positions).map(([id, pos]) => {
+      const device = devicesByIdRef.current.get(id);
+      if (!device) return null;
+
+      return (
+        <CustomDeviceMarker
+          key={id}
+          device={device}
+          onPress={() => handleSelectDevice(device)}
+        />
+      );
+    });
+  });
+
+  DeviceMarkers.displayName = 'DeviceMarkers';
+  /* ------------------ Render ------------------ */
 
   return (
     <View
@@ -67,7 +173,6 @@ export default function MapDashboard() {
         { backgroundColor: theme === 'light' ? '#f0f0f0' : '#121212' },
       ]}
     >
-      {/* Map */}
       {region ? (
         <MapView
           ref={mapRef}
@@ -80,49 +185,45 @@ export default function MapDashboard() {
           rotateEnabled={false}
           pitchEnabled={false}
           customMapStyle={mapStyle}
+          onPress={handleMapPress}
         >
-          {/* Device markers */}
-          {devices?.map((device) => {
-            const lat = parseFloat(device.latest_lat);
-            const lng = parseFloat(device.latest_lng);
-            if (!lat || !lng) return null; // skip devices without location
-
-            return (
-              <Marker
-                key={device.device_id}
-                coordinate={{ latitude: lat, longitude: lng }}
-                title={device.device_name + ' - ' + device.serial_number}
-                description={`Last seen at: ${new Date(device.last_seen_at).toDateString()} - ${new Date(device.last_seen_at).toLocaleTimeString()}`}
-                pinColor={device.device_color || 'red'}
-              />
-            );
-          })}
+          <DeviceMarkers />
         </MapView>
       ) : (
         <View style={styles.loader}>
           <ActivityIndicator size="large" color="#2563EB" />
         </View>
       )}
+
+      <DeviceDetailsModal
+        visible={detailsVisible}
+        device={selectedDevice}
+        onClose={() => setDetailsVisible(false)}
+      />
+
       <Pressable style={styles.absoluteTopRight} onPress={goToHome}>
         <FontAwesome name="compass" size={24} color="black" />
       </Pressable>
-      {/* Bottom action cards */}
+
       <SafeAreaView
-        style={[styles.bottomCards, { backgroundColor: bottomBg }]}
+        style={[
+          styles.bottomCards,
+          { backgroundColor: theme === 'light' ? '#f0f0f0' : '#272727' },
+        ]}
         edges={['bottom', 'left', 'right']}
       >
         <DynamicCard
-          name="Devices"
-          subText={getDeviceText()}
-          nameTextBold
+          name={`Devices (${contextDevices?.length || 0})`}
           prefixIcon="server"
           suffixIcon="chevron-right"
+          nameTextBold
           onPress={() => router.navigate(ROUTES.MAP.DEVICES)}
         />
       </SafeAreaView>
     </View>
   );
 }
+
 const mapStyle = [
   {
     featureType: 'poi',
@@ -135,14 +236,11 @@ const mapStyle = [
     stylers: [{ visibility: 'off' }],
   },
 ];
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   mapContainer: { flex: 1 },
-  loader: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   absoluteTopRight: {
     width: 48,
     aspectRatio: 1,

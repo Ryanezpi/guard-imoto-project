@@ -1,6 +1,5 @@
 import AddDeviceCard from '@/components/ui/AddDeviceCard';
-import DevicePrefix from '@/components/ui/DevicePrefix';
-import DynamicList, { DynamicListItem } from '@/components/ui/DynamicList';
+import { DeviceCard } from '@/components/ui/DeviceCard';
 import { useAuth } from '@/context/AuthContext';
 import { useDevices } from '@/context/DeviceContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -11,17 +10,18 @@ import {
   CameraView,
   useCameraPermissions,
 } from 'expo-camera';
-import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Modal,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
   View,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -36,7 +36,6 @@ export default function MapDevicesScreen() {
   const subTextColor = theme === 'light' ? '#1C1C1E' : '#9ca3af';
   const borderColor = theme === 'light' ? '#d1d5db' : '#3f3f46';
 
-  const [items, setItems] = useState<DynamicListItem[]>([]);
   const [scanning, setScanning] = useState(false);
   const [manualAdd, setManualAdd] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
@@ -47,70 +46,15 @@ export default function MapDevicesScreen() {
   const [serial_number, setSerialNumber] = useState('');
   const [addingDevice, setAddingDevice] = useState(false);
 
-  // -----------------------------
-  // Initialize list from context
-  // -----------------------------
-  useEffect(() => {
-    if (!initial_devices) return;
+  const [refreshing, setRefreshing] = useState(false);
 
-    const mappedItems = initial_devices.map((d) => ({
-      id: d.device_id,
-      name: d.device_name ?? d.serial_number,
-      prefixElement: <DevicePrefix color={d.device_color ?? '#E53935'} />,
-      subText: d.paired ? 'Enabled' : 'Disabled',
-      subTextColor: d.paired ? '#2fa500ff' : '#E53935',
-      suffixIcon: 'chevron-right' as const,
-      onPress: () =>
-        router.navigate({
-          pathname: '/map/device-settings',
-          params: {
-            device_id: d.device_id,
-            device_color: d.device_color ?? '#E53935',
-          },
-        }),
-    }));
-
-    setItems(mappedItems);
-  }, [initial_devices]);
-
-  // -----------------------------
-  // Add device helper
-  // -----------------------------
-  const addDeviceToList = (device: {
-    device_id: string;
-    device_color: string;
-    device_enabled: boolean;
-    device_name?: string;
-  }) => {
-    setItems((prevItems) => {
-      if (
-        prevItems.some(
-          (i) => i.name === device.device_name || i.name === device.device_id
-        )
-      )
-        return prevItems;
-
-      const uniqueId = `${device.device_id}-${Date.now()}`;
-      return [
-        ...prevItems,
-        {
-          id: uniqueId,
-          name: device.device_name ?? device.device_id,
-          prefixElement: <DevicePrefix color={device.device_color} />,
-          subText: device.device_enabled ? 'Enabled' : 'Disabled',
-          subTextColor: device.device_enabled ? '#2fa500ff' : '#E53935',
-          suffixIcon: 'chevron-right',
-          onPress: () =>
-            router.navigate({
-              pathname: '/map/device-settings',
-              params: {
-                device_id: device.device_id,
-                device_color: device.device_color,
-              },
-            }),
-        },
-      ];
-    });
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshDevices();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   // -----------------------------
@@ -130,13 +74,6 @@ export default function MapDevicesScreen() {
       });
 
       await refreshDevices(); // refresh context so initial_devices updates
-
-      addDeviceToList({
-        device_id: parsed.device_id,
-        device_color: parsed.device_color ?? '#E53935',
-        device_enabled: parsed.device_enabled ?? true,
-        device_name: parsed.device_name,
-      });
     } catch (err) {
       Alert.alert('Error', 'Failed to add device or invalid QR.');
       console.error(err);
@@ -227,10 +164,24 @@ export default function MapDevicesScreen() {
       style={[styles.safeArea, { backgroundColor: bgColor }]}
       edges={['bottom', 'left', 'right']}
     >
-      <DynamicList items={items} />
-      <View style={styles.padding}>
-        <AddDeviceCard onPress={() => setManualAdd(true)} />
-      </View>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 24 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={textColor}
+          />
+        }
+      >
+        {initial_devices?.map((device) => (
+          <DeviceCard key={device.device_id} device={device} />
+        ))}
+
+        <View style={styles.padding}>
+          <AddDeviceCard onPress={() => setManualAdd(true)} />
+        </View>
+      </ScrollView>
 
       {/* Manual add modal */}
       <Modal visible={manualAdd} transparent animationType="slide">
@@ -296,7 +247,18 @@ export default function MapDevicesScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
 
+  statusRowOffline: {
+    opacity: 0.45,
+  },
+
+  statusDivider: {
+    width: 4,
+  },
   overlay: {
     position: 'absolute',
     bottom: 32,

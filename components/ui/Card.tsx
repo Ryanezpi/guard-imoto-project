@@ -37,6 +37,9 @@ interface DynamicCardProps {
   suffixIcon?: keyof typeof FontAwesome.glyphMap | null;
   suffixSize?: number;
   suffixColor?: string;
+  suffixText?: string | number;
+  suffixTextColor?: string;
+  suffixTextSize?: number;
 
   expandable?: boolean;
   expanded?: boolean;
@@ -65,6 +68,9 @@ export default function DynamicCard({
   suffixIcon,
   suffixSize = 12,
   suffixColor,
+  suffixText,
+  suffixTextColor,
+  suffixTextSize = 13,
   expandable = false,
   expanded: expandedProp,
   customBgColor,
@@ -177,21 +183,39 @@ export default function DynamicCard({
               thumbColor="#fff"
               ios_backgroundColor="#3e3e3e"
             />
-          ) : expandable ? (
-            <FontAwesome
-              name={isExpanded ? 'chevron-up' : 'chevron-down'}
-              size={suffixSize}
-              color={suffixFinalColor}
-            />
           ) : (
-            !editable &&
-            suffixIcon && (
-              <FontAwesome
-                name={suffixIcon}
-                size={suffixSize}
-                color={suffixFinalColor}
-              />
-            )
+            <>
+              {suffixText !== undefined && (
+                <Text
+                  style={{
+                    fontSize: suffixTextSize,
+                    color: suffixTextColor ?? suffixFinalColor,
+                    marginRight: suffixIcon || expandable ? 6 : 0,
+                    fontWeight: '500',
+                  }}
+                  numberOfLines={1}
+                >
+                  {suffixText}
+                </Text>
+              )}
+
+              {expandable ? (
+                <FontAwesome
+                  name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={suffixSize}
+                  color={suffixFinalColor}
+                />
+              ) : (
+                !editable &&
+                suffixIcon && (
+                  <FontAwesome
+                    name={suffixIcon}
+                    size={suffixSize}
+                    color={suffixFinalColor}
+                  />
+                )
+              )}
+            </>
           )}
         </View>
       </View>

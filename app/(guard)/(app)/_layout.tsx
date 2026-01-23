@@ -142,23 +142,6 @@ function LayoutContent() {
         }}
       />
       <Stack.Screen
-        name="profile/devices"
-        options={{
-          headerStyle: { backgroundColor: headerBg },
-          headerTitleAlign: 'center',
-          headerTitle: () => (
-            <Text
-              style={{ fontSize: 18, fontWeight: '600', color: titleColor }}
-            >
-              Device Details
-            </Text>
-          ),
-          headerLeft: () => (
-            <NavButton route="back" iconName="arrow-left" color={titleColor} />
-          ),
-        }}
-      />
-      <Stack.Screen
         name="profile/logs"
         options={{
           headerStyle: { backgroundColor: headerBg },

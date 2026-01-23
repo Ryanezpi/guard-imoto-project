@@ -92,7 +92,11 @@ export default function AuditLogDetailsScreen() {
         <DynamicCard
           name="Date"
           nameTextBold={true}
-          value={new Date(log.created_at).toLocaleString()}
+          value={
+            new Date(log.created_at).toDateString() +
+            ' - ' +
+            new Date(log.created_at).toLocaleTimeString()
+          }
         />
 
         {/* Metadata */}

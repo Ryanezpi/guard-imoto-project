@@ -1,6 +1,6 @@
 import DynamicCard from '@/components/ui/Card';
 import TitleSection from '@/components/ui/TitleSection';
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScrollView, View, Alert } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { SafeAreaView } from 'react-native-safe-area-context';

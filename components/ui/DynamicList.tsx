@@ -15,7 +15,7 @@ export interface DynamicListItem {
   id: string;
   name: string;
   value?: string;
-  subText?: string | number;
+  subText?: string | number | any;
   subTextColor?: string;
   subTextBold?: boolean;
   prefixElement?: React.ReactNode;
@@ -25,6 +25,7 @@ export interface DynamicListItem {
   suffixIcon?: keyof typeof FontAwesome.glyphMap;
   expandable?: boolean;
   expanded?: boolean;
+  device_id?: string;
   onPress?: () => void;
   children?: React.ReactNode;
   date?: Date;

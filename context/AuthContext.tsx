@@ -58,9 +58,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const fbUser = auth.currentUser;
     if (!fbUser) return;
 
-    const newToken = await fbUser.getIdToken(true);
-    await SecureStore.setItemAsync(TOKEN_KEY, newToken);
-    setIdToken(newToken);
+    const token = await getFreshIdToken();
+    await SecureStore.setItemAsync(TOKEN_KEY, token);
+    setIdToken(token);
 
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
     refreshTimer.current = setTimeout(refreshToken, 45 * 60 * 1000);
@@ -78,11 +78,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!idToken) return null;
 
     try {
-      const me = await getMeAPI(idToken);
+      const token = await getFreshIdToken();
+      const me = await getMeAPI(token);
       const expoToken = await getStoredExpoToken();
 
       if (expoToken && me.expo_push_token !== expoToken) {
-        await updateProfile(idToken, {
+        await updateProfile(token, {
           first_name: me.first_name,
           last_name: me.last_name,
           phone: me.phone,
@@ -96,8 +97,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setStatus('authenticated');
       hideLoader();
       return me;
-    } catch (err) {
+    } catch (err: any) {
       console.log('Failed to refresh user:', err);
+      if (err.status === 401) {
+        return await refreshUser();
+      }
       return null;
     }
   }, [hideLoader, idToken]);
@@ -130,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-          const token = await fbUser.getIdToken();
+          const token = await getFreshIdToken();
           await SecureStore.setItemAsync(TOKEN_KEY, token);
           setIdToken(token);
 
@@ -194,6 +198,13 @@ export const useAuth = () => {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 };
+
+export async function getFreshIdToken(): Promise<string> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('No authenticated user');
+
+  return await user.getIdToken(true); // force refresh if needed
+}
 
 async function getStoredExpoToken(): Promise<string | null> {
   try {

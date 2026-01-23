@@ -48,7 +48,6 @@ export const ROUTES = {
   },
   PROFILE: {
     ROOT: '/(guard)/(app)/profile',
-    DEVICES: '/(guard)/(app)/profile/devices',
     EDIT: '/(guard)/(app)/profile/edit',
     LOGS: '/(guard)/(app)/profile/logs',
     NOTIFICATIONS: '/(guard)/(app)/profile/notifications',

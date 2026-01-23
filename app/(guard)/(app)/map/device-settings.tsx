@@ -1,7 +1,6 @@
 import DynamicCard from '@/components/ui/Card';
 import DevicePrefix from '@/components/ui/DevicePrefix';
 import ConfirmModal from '@/components/ui/forms/ConfirmModal';
-import SegmentToggle from '@/components/ui/SegmentToggle';
 import TitleSection from '@/components/ui/TitleSection';
 import { DEVICE_COLORS } from '@/constants/colors';
 import { ROUTES } from '@/constants/routes';
@@ -9,9 +8,13 @@ import { useAuth } from '@/context/AuthContext';
 import { useDevices } from '@/context/DeviceContext';
 import { useLoader } from '@/context/LoaderContext';
 import { useTheme } from '@/context/ThemeContext';
-import { patchDeviceConfig, unlinkDevice } from '@/services/user.service';
+import {
+  getDeviceTelemetrySummary,
+  patchDeviceConfig,
+  unlinkDevice,
+} from '@/services/user.service';
 import { router, useGlobalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ScrollView,
   TextInput,
@@ -23,16 +26,33 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import PubNub from 'pubnub';
-const pubnub = new PubNub({
-  subscribeKey: process.env.EXPO_PUBLIC_PUBNUB_SUBSCRIBE_KEY || 'demo',
-  publishKey: process.env.EXPO_PUBLIC_PUBNUB_PUBLISH_KEY || 'demo',
-  ssl: true,
-  uuid: 'anonymous',
-});
+import { TelemetryModal } from '@/components/ui/TelemetryModal';
+
+type TelemetrySummary = {
+  gps?: {
+    lat: number;
+    lng: number;
+    accuracy: number | null;
+    recorded_at: string;
+  };
+  gyro?: {
+    x: number;
+    y: number;
+    z: number;
+    recorded_at: string;
+  };
+  rfid?: {
+    tag_uid: string;
+    recorded_at: string;
+  };
+  detections_24h: number;
+};
+
+export type TelemetryType = 'gps' | 'gyro' | 'rfid' | 'detections' | null;
 
 type DeviceState = {
   name: string;
+  serial?: string;
   color: string;
   enabled: boolean;
   pubnub_channel?: string;
@@ -64,6 +84,7 @@ type DeviceState = {
 function mapApiDeviceToState(api: any): DeviceState {
   return {
     name: api.device_name ?? api.serial_number,
+    serial: api.serial_number,
     color: api.device_color ?? '#E53935',
     enabled: api.paired,
     pubnub_channel: api.pubnub_channel ?? undefined,
@@ -143,17 +164,50 @@ export default function DeviceSettingsScreen() {
   const deviceId = params.device_id;
 
   const { devices } = useDevices();
-  const [readMode, setReadMode] = useState<'realtime' | 'interval'>('interval');
   const [intervalSec] = useState(60);
   const [device, setDevice] = useState<DeviceState | null>(null);
   const [draft, setDraft] = useState<DeviceState | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const [showEditModal, setShowEditModal] = useState(false);
+  const [telemetry, setTelemetry] = useState<TelemetrySummary | null>(null);
 
   const updateDraft = (updater: (d: DeviceState) => DeviceState) => {
     setDraft((prev) => (prev ? updater(prev) : prev));
   };
+  const [telemetryModal, setTelemetryModal] = useState<{
+    type: 'gps' | 'gyro' | 'rfid' | 'detections' | null;
+  }>({ type: null });
+
+  const openTelemetryModal = (type: TelemetryType) => {
+    setTelemetryModal({ type });
+  };
+
+  const loadTelemetry = useCallback(async () => {
+    try {
+      const res = await getDeviceTelemetrySummary(idToken!, deviceId!);
+      setTelemetry(res || []);
+    } catch (e) {
+      console.error('[TELEMETRY]', e);
+    }
+  }, [deviceId, idToken]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        showLoader();
+        await loadTelemetry();
+      } finally {
+        if (mounted) hideLoader();
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [hideLoader, loadTelemetry, showLoader]);
 
   const openEditModal = () => {
     setDraft(structuredClone(device));
@@ -163,6 +217,8 @@ export default function DeviceSettingsScreen() {
   const onRefresh = async () => {
     try {
       setRefreshing(true);
+
+      await loadTelemetry();
       await refreshDevices();
     } finally {
       setRefreshing(false);
@@ -268,7 +324,10 @@ export default function DeviceSettingsScreen() {
 
       (async () => {
         try {
-          await patchDeviceConfig(idToken!, deviceId!, patch);
+          showLoader();
+          await patchDeviceConfig(idToken!, deviceId!, patch).finally(
+            () => hideLoader
+          );
           await refreshDevices();
         } catch (e: any) {
           setDevice(snapshot);
@@ -279,41 +338,23 @@ export default function DeviceSettingsScreen() {
       return next;
     });
   };
-  useEffect(() => {
-    if (readMode !== 'realtime' || !device?.pubnub_channel) return;
-
-    const listener = {
-      message: async () => {
-        await refreshDevices();
-      },
-    };
-
-    pubnub.addListener(listener);
-    pubnub.subscribe({ channels: [device.pubnub_channel] });
-
-    return () => {
-      pubnub.removeListener(listener);
-      pubnub.unsubscribe({ channels: [device.pubnub_channel!] });
-    };
-  }, [readMode, device?.pubnub_channel, refreshDevices]);
 
   useEffect(() => {
-    if (readMode !== 'interval') return;
-
     const interval = setInterval(async () => {
       if (!idToken || !deviceId) return;
 
       try {
+        await loadTelemetry();
         await refreshDevices();
         console.log('Interval device data Refreshed');
         // update device state here
       } catch (err) {
         console.error('Failed to fetch interval data', err);
       }
-    }, intervalSec * 1000);
+    }, intervalSec * 2000);
 
     return () => clearInterval(interval);
-  }, [readMode, intervalSec, deviceId, idToken, refreshDevices]);
+  }, [intervalSec, deviceId, idToken, refreshDevices, loadTelemetry]);
 
   if (!device || !draft) {
     return (
@@ -329,6 +370,15 @@ export default function DeviceSettingsScreen() {
       style={{ flex: 1, backgroundColor: bgColor }}
       edges={['bottom', 'left', 'right']}
     >
+      <TelemetryModal
+        visible={!!telemetryModal.type}
+        type={telemetryModal.type as TelemetryType}
+        deviceId={deviceId!}
+        idToken={idToken!}
+        realtime={false}
+        onClose={() => setTelemetryModal({ type: null })}
+      />
+
       <ConfirmModal
         visible={showEditModal}
         title="Edit Device"
@@ -341,12 +391,15 @@ export default function DeviceSettingsScreen() {
             showLoader();
             const payload = mapStateToPatchConfig(draft);
             await patchDeviceConfig(idToken!, deviceId!, payload);
+            await loadTelemetry();
             await refreshDevices().then(hideLoader);
-
             setDevice(draft);
             setShowEditModal(false);
           } catch (e: any) {
+            hideLoader();
             Alert.alert('Update failed', e.message);
+          } finally {
+            hideLoader();
           }
         }}
       >
@@ -443,30 +496,70 @@ export default function DeviceSettingsScreen() {
           />
         }
       >
-        <TitleSection
-          title="Data Read Mode"
-          subtitle="Choose how the device data is fetched."
-        >
-          <SegmentToggle
-            value={readMode}
-            onChange={(val) => setReadMode(val)}
-            options={[
-              { label: 'Realtime', value: 'realtime' },
-              { label: 'Interval', value: 'interval' },
-            ]}
+        <TitleSection title="Sensor Data">
+          {/* GPS */}
+          <DynamicCard
+            name="GPS"
+            prefixIcon="map-marker"
+            subText={
+              telemetry?.gps
+                ? `Last fix • ${new Date(telemetry.gps.recorded_at).toLocaleTimeString()}`
+                : 'No data'
+            }
+            suffixText={
+              telemetry?.gps?.accuracy
+                ? `±${telemetry.gps.accuracy}m`
+                : undefined
+            }
+            onPress={() => openTelemetryModal('gps')}
           />
 
-          {readMode === 'interval' && (
-            <Text style={{ marginTop: 8, fontSize: 13, color: '#888' }}>
-              Fetches device data every {intervalSec} seconds.
-            </Text>
-          )}
+          {/* Gyro */}
+          <DynamicCard
+            name="Gyroscope"
+            prefixIcon="balance-scale"
+            subText={
+              telemetry?.gyro
+                ? `Last movement • ${new Date(telemetry.gyro.recorded_at).toLocaleTimeString()}`
+                : 'No data'
+            }
+            suffixText={
+              telemetry?.gyro
+                ? Math.sqrt(
+                    telemetry.gyro.x ** 2 +
+                      telemetry.gyro.y ** 2 +
+                      telemetry.gyro.z ** 2
+                  ).toFixed(2)
+                : undefined
+            }
+            onPress={() => openTelemetryModal('gyro')}
+          />
+
+          {/* RFID */}
+          <DynamicCard
+            name="RFID"
+            prefixIcon="qrcode"
+            subText={
+              telemetry?.rfid
+                ? `Last scan • ${telemetry.rfid.tag_uid}`
+                : 'No scans yet'
+            }
+            onPress={() => openTelemetryModal('rfid')}
+          />
+
+          {/* Alerts */}
+          <DynamicCard
+            name="Detections (24h)"
+            prefixIcon="warning"
+            subText={`${telemetry?.detections_24h ?? 0} events`}
+            onPress={() => openTelemetryModal('detections')}
+          />
         </TitleSection>
 
         {/* DEVICE SETTINGS */}
         <TitleSection title="Device Settings">
           <DynamicCard
-            name={device.name}
+            name={device.name + ' - ' + device.serial}
             nameTextBold
             subText={device.enabled ? 'Enabled' : 'Disabled'}
             subTextColor={device.enabled ? '#2fa500ff' : '#ff3b30ff'}
@@ -640,6 +733,7 @@ export default function DeviceSettingsScreen() {
               })
               .then(() => {
                 hideLoader();
+                loadTelemetry();
                 refreshDevices();
                 router.back();
               });

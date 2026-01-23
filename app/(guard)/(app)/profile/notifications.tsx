@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DynamicListItem } from '@/components/ui/DynamicList';
 import { useTheme } from '@/context/ThemeContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import DevicePrefix from '@/components/ui/DevicePrefix';
 import {
   ActivityIndicator,
@@ -12,19 +11,40 @@ import {
   FlatList,
 } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
-import { getMyAlerts } from '@/services/user.service';
+import { getByDeviceId, getMyAlerts } from '@/services/user.service';
 import DynamicCard from '@/components/ui/Card';
+import DeviceDetailsModal from '@/components/ui/DeviceDetailsModal';
 
 export default function NotificationsScreen() {
   const { theme } = useTheme();
   const { idToken } = useAuth();
-  const router = useRouter();
 
   const bgColor = theme === 'light' ? '#f0f0f0' : '#272727';
 
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState<any | null>(null);
+  const [deviceLoading, setDeviceLoading] = useState(false);
+  const [detailsVisible, setDetailsVisible] = useState(false);
+
+  const handleAlertPress = useCallback(
+    async (alert: any) => {
+      try {
+        setDeviceLoading(true);
+        setDetailsVisible(true);
+
+        const res = await getByDeviceId(idToken!, alert.device_id);
+        setSelectedDevice(res.device);
+      } catch (e) {
+        console.error('[DEVICE DETAILS]', e);
+        setDetailsVisible(false);
+      } finally {
+        setDeviceLoading(false);
+      }
+    },
+    [idToken]
+  );
 
   const loadAlerts = useCallback(async () => {
     try {
@@ -73,22 +93,13 @@ export default function NotificationsScreen() {
           (alert.device_name || 'Unknown Device') + ` - ${alert.serial_number}`,
         subText:
           alert.type.replace(/_/g, ' ') +
-          ` - ${new Date(alert.created_at).toDateString()}`,
+          ` - (${new Date(alert.created_at).toDateString()} - ${new Date(alert.created_at).toLocaleTimeString()})`,
         prefixElement: <DevicePrefix color={color} />,
         suffixIcon: 'chevron-right',
-        onPress: () =>
-          router.navigate({
-            pathname: '/profile/devices',
-            params: {
-              deviceId: alert.device_id,
-              prefixColor: color,
-              deviceEnabled: 'true',
-            },
-          }),
+        onPress: () => handleAlertPress(alert),
       };
     });
-  }, [alerts, router]);
-
+  }, [alerts, handleAlertPress]);
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
@@ -106,6 +117,13 @@ export default function NotificationsScreen() {
       style={{ flex: 1, backgroundColor: bgColor, padding: 16 }}
       edges={['bottom', 'left', 'right']}
     >
+      <DeviceDetailsModal
+        visible={detailsVisible}
+        loading={deviceLoading}
+        device={selectedDevice}
+        onClose={() => setDetailsVisible(false)}
+      />
+
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
