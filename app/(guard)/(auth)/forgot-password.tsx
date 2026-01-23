@@ -1,5 +1,7 @@
+import { useLoader } from '@/context/LoaderContext';
 import { useTheme } from '@/context/ThemeContext';
 import { auth } from '@/lib/firebase';
+import { checkEmailAvailability } from '@/services/auth.service';
 import { useRouter } from 'expo-router';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { useState } from 'react';
@@ -16,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ForgotPassword() {
   const { theme } = useTheme();
+  const { showLoader, hideLoader } = useLoader();
   const router = useRouter();
 
   const [email, setEmail] = useState('');
@@ -30,28 +33,50 @@ export default function ForgotPassword() {
   const subTextColor = theme === 'light' ? '#1C1C1E' : '#9ca3af';
   const borderColor = theme === 'light' ? '#d1d5db' : '#3f3f46';
 
+  const validateEmail = (email: string) => {
+    // Basic email regex
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  };
+
   const submit = async () => {
-    if (!email.trim()) {
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
       setErrorMessage('Please enter your email.');
+      return;
+    }
+
+    if (!validateEmail(trimmedEmail)) {
+      setErrorMessage('Please enter a valid email address.');
       return;
     }
 
     setSending(true);
     setErrorMessage(null);
     setSuccessMessage(null);
+    showLoader();
 
     try {
-      await sendPasswordResetEmail(auth, email.trim());
+      const available = await checkEmailAvailability(trimmedEmail);
+
+      if (available) {
+        // If available, that means email does NOT exist
+        setErrorMessage('This email is not registered.');
+        return;
+      }
+
+      await sendPasswordResetEmail(auth, trimmedEmail);
       setSuccessMessage(
-        `Password reset email sent to ${email.trim()}. Check your inbox.`
+        `Password reset email sent to ${trimmedEmail}. Check your inbox.`
       );
       setSent(true);
     } catch (err: any) {
       console.error('Failed to send reset email:', err);
-      setErrorMessage(
-        'Failed to send reset email. Check your email and try again.'
-      );
+      hideLoader();
+      setErrorMessage(err.message || 'Failed to send reset email. Try again.');
     } finally {
+      hideLoader();
       setSending(false);
     }
   };
@@ -115,22 +140,24 @@ export default function ForgotPassword() {
             </Pressable>
           )}
 
-          <Pressable
-            style={[
-              styles.primaryButton,
-              {
-                marginTop: sent ? 12 : 16,
-                borderWidth: 1,
-                borderColor,
-                backgroundColor: 'transparent',
-              },
-            ]}
-            onPress={() => router.back()}
-          >
-            <Text style={[styles.primaryButtonText, { color: textColor }]}>
-              Cancel
-            </Text>
-          </Pressable>
+          {!sent && (
+            <Pressable
+              style={[
+                styles.primaryButton,
+                {
+                  marginTop: sent ? 12 : 16,
+                  borderWidth: 1,
+                  borderColor,
+                  backgroundColor: 'transparent',
+                },
+              ]}
+              onPress={() => router.back()}
+            >
+              <Text style={[styles.primaryButtonText, { color: textColor }]}>
+                Cancel
+              </Text>
+            </Pressable>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -144,7 +171,6 @@ const styles = StyleSheet.create({
 
   card: {
     flex: 1,
-    marginHorizontal: 20,
     borderRadius: 20,
     padding: 24,
   },

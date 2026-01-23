@@ -313,30 +313,34 @@ export default function DeviceSettingsScreen() {
   }, [devices, deviceId]);
 
   const updateAndSync = (updater: (d: DeviceState) => DeviceState) => {
+    let snapshot: DeviceState;
+    let nextState: DeviceState;
+    let patch: Record<string, any> = {};
+
     setDevice((prev) => {
       if (!prev) return prev;
 
-      const snapshot = structuredClone(prev);
-      const next = updater(prev);
+      snapshot = structuredClone(prev);
+      nextState = updater(prev);
+      patch = diffPatch(snapshot, nextState);
 
-      const patch = diffPatch(snapshot, next);
-      if (Object.keys(patch).length === 0) return next;
-
-      (async () => {
-        try {
-          showLoader();
-          await patchDeviceConfig(idToken!, deviceId!, patch).finally(
-            () => hideLoader
-          );
-          await refreshDevices();
-        } catch (e: any) {
-          setDevice(snapshot);
-          Alert.alert('Sync failed', e.message);
-        }
-      })();
-
-      return next;
+      return nextState;
     });
+
+    setTimeout(async () => {
+      if (!Object.keys(patch).length) return;
+
+      try {
+        showLoader();
+        await patchDeviceConfig(idToken!, deviceId!, patch);
+        await refreshDevices();
+      } catch (e: any) {
+        setDevice(snapshot!);
+        Alert.alert('Sync failed', e.message);
+      } finally {
+        hideLoader();
+      }
+    }, 0);
   };
 
   useEffect(() => {
