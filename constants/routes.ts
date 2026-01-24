@@ -8,6 +8,7 @@ export const ROUTES = {
     ROOT: '/(onboarding)',
     WALKTHROUGH: '/(onboarding)/walkthrough',
     PERMISSIONS: '/(onboarding)/permissions',
+    PRIVACY_POLICY: '/(onboarding)/privacy-policy',
   },
 
   // ───────────────────────────────
