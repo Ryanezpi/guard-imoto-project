@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Modal,
   View,
@@ -7,6 +7,8 @@ import {
   ScrollView,
   Dimensions,
   type TextProps,
+  Keyboard,
+  Platform,
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -44,6 +46,7 @@ export default function ConfirmModal({
   fullWidthActions = false,
 }: ConfirmModalProps) {
   const { theme } = useTheme();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const bg = theme === 'light' ? '#fff' : '#1f1f1f';
   const text = theme === 'light' ? '#111827' : '#f9fafb';
@@ -100,6 +103,21 @@ export default function ConfirmModal({
     return text;
   };
 
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const subShow = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates?.height ?? 0);
+    });
+    const subHide = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+
+    return () => {
+      subShow.remove();
+      subHide.remove();
+    };
+  }, []);
+
   return (
     <Modal
       transparent
@@ -145,9 +163,11 @@ export default function ConfirmModal({
           {/* SCROLLABLE CONTENT */}
           {children ? (
             <ScrollView
+              keyboardShouldPersistTaps="handled"
               contentContainerStyle={{
                 paddingHorizontal: 16,
-                paddingBottom: 12,
+                // Keep the modal size stable; just add scrollable space when the keyboard is up.
+                paddingBottom: 16 + keyboardHeight,
               }}
               showsVerticalScrollIndicator={false}
             >

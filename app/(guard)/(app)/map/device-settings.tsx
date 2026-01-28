@@ -15,6 +15,13 @@ import {
   getDeviceTelemetrySummary,
   getDeviceNFCs,
   getMyAlerts,
+  getVehicle,
+  createVehicle,
+  updateVehicle,
+  deleteVehicle,
+  type Vehicle,
+  type VehicleType,
+  type UpsertVehicleBody,
   patchDeviceConfig,
   unlinkDevice,
 } from '@/services/user.service';
@@ -24,12 +31,14 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
+  Pressable,
   View,
   Text,
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import AuthTextField from '@/components/ui/forms/AuthTextField';
 
 import { TelemetryModal } from '@/components/ui/TelemetryModal';
 
@@ -54,6 +63,17 @@ type TelemetrySummary = {
 };
 
 export type TelemetryType = 'gps' | 'gyro' | 'rfid' | 'detections' | null;
+
+const VEHICLE_TYPES: VehicleType[] = [
+  'motorbike',
+  'motorcycle',
+  'bike',
+  'car',
+  'scooter',
+  'truck',
+  'van',
+  'other',
+];
 
 type DeviceState = {
   name: string;
@@ -185,6 +205,13 @@ export default function DeviceSettingsScreen() {
   const [unresolvedCount, setUnresolvedCount] = useState(0);
   const [nfcCount, setNfcCount] = useState<number | undefined>(undefined);
   const [nfcLoading, setNfcLoading] = useState(false);
+  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [vehicleLoading, setVehicleLoading] = useState(false);
+  const [vehicleModalVisible, setVehicleModalVisible] = useState(false);
+  const [vehicleTypeModalVisible, setVehicleTypeModalVisible] = useState(false);
+  const [vehicleDraft, setVehicleDraft] = useState<UpsertVehicleBody>({
+    type: 'motorbike',
+  });
 
   const updateDraft = (updater: (d: DeviceState) => DeviceState) => {
     setDraft((prev) => (prev ? updater(prev) : prev));
@@ -221,9 +248,12 @@ export default function DeviceSettingsScreen() {
     [closeAlert]
   );
 
-  const requestRelayConfirm = useCallback((channel: 1 | 2, nextValue: boolean) => {
-    setRelayConfirm({ visible: true, channel, nextValue });
-  }, []);
+  const requestRelayConfirm = useCallback(
+    (channel: 1 | 2, nextValue: boolean) => {
+      setRelayConfirm({ visible: true, channel, nextValue });
+    },
+    []
+  );
   const closeRelayConfirm = useCallback(
     () => setRelayConfirm((prev) => ({ ...prev, visible: false })),
     []
@@ -271,6 +301,36 @@ export default function DeviceSettingsScreen() {
     }
   }, [deviceId, idToken]);
 
+  const isVehicleEmpty = useCallback((v: Vehicle | null) => {
+    if (!v) return true;
+    const hasAny =
+      Boolean(v.nickname) ||
+      Boolean(v.make) ||
+      Boolean(v.model) ||
+      Boolean(v.year) ||
+      Boolean(v.color) ||
+      Boolean(v.license_plate) ||
+      Boolean(v.vin) ||
+      Boolean(v.image_url) ||
+      (v.type && v.type !== 'motorbike');
+    return !hasAny;
+  }, []);
+
+  const loadVehicle = useCallback(async () => {
+    try {
+      if (!idToken || !deviceId) return;
+      setVehicleLoading(true);
+      const res = await getVehicle(idToken, deviceId);
+      // Treat "empty" vehicles (all-null metadata) as unbound.
+      setVehicle(isVehicleEmpty(res) ? null : (res as Vehicle));
+    } catch (e) {
+      console.error('[VEHICLE]', e);
+      setVehicle(null);
+    } finally {
+      setVehicleLoading(false);
+    }
+  }, [deviceId, idToken, isVehicleEmpty]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -280,6 +340,7 @@ export default function DeviceSettingsScreen() {
         await loadTelemetry();
         await loadAlerts();
         await loadNfcCount();
+        await loadVehicle();
       } finally {
         if (mounted) hideLoader();
       }
@@ -288,7 +349,14 @@ export default function DeviceSettingsScreen() {
     return () => {
       mounted = false;
     };
-  }, [hideLoader, loadAlerts, loadTelemetry, loadNfcCount, showLoader]);
+  }, [
+    hideLoader,
+    loadAlerts,
+    loadTelemetry,
+    loadNfcCount,
+    loadVehicle,
+    showLoader,
+  ]);
 
   const openEditModal = () => {
     setDraft(structuredClone(device));
@@ -302,6 +370,7 @@ export default function DeviceSettingsScreen() {
       await loadTelemetry();
       await loadAlerts();
       await loadNfcCount();
+      await loadVehicle();
       await refreshDevices();
     } finally {
       setRefreshing(false);
@@ -515,6 +584,62 @@ export default function DeviceSettingsScreen() {
       ) : null}
     </View>
   );
+
+  const openVehicleModal = () => {
+    const current = vehicle;
+    setVehicleDraft({
+      type: current?.type ?? 'motorbike',
+      nickname: current?.nickname ?? '',
+      make: current?.make ?? '',
+      model: current?.model ?? '',
+      year: current?.year ?? undefined,
+      color: current?.color ?? '',
+      license_plate: current?.license_plate ?? '',
+      vin: current?.vin ?? '',
+      image_url: current?.image_url ?? '',
+    });
+    setVehicleModalVisible(true);
+  };
+
+  const sanitizeVehicleDraft = (
+    draft: UpsertVehicleBody
+  ): UpsertVehicleBody => {
+    const cleaned: UpsertVehicleBody = {};
+    const t = String(draft.type ?? 'motorbike') as VehicleType;
+    cleaned.type = (VEHICLE_TYPES.includes(t) ? t : 'motorbike') as VehicleType;
+
+    const trimOrNull = (v: unknown) => {
+      const s = String(v ?? '').trim();
+      return s.length ? s : null;
+    };
+
+    cleaned.nickname = trimOrNull(draft.nickname);
+    cleaned.make = trimOrNull(draft.make);
+    cleaned.model = trimOrNull(draft.model);
+    cleaned.color = trimOrNull(draft.color);
+    cleaned.license_plate = trimOrNull(draft.license_plate);
+    cleaned.vin = trimOrNull(draft.vin);
+    cleaned.image_url = trimOrNull(draft.image_url);
+
+    if (
+      draft.year === undefined ||
+      draft.year === null ||
+      draft.year === ('' as any)
+    ) {
+      cleaned.year = null;
+    } else {
+      const n = Number(draft.year);
+      cleaned.year = Number.isFinite(n) ? Math.trunc(n) : null;
+    }
+
+    return cleaned;
+  };
+
+  const vehicleTypeLabel = (t?: VehicleType | null) => {
+    const v = (t ?? 'motorbike') as string;
+    const spaced = v.replace(/_/g, ' ');
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+  };
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: bgColor }}
@@ -683,6 +808,210 @@ export default function DeviceSettingsScreen() {
         </View>
       </ConfirmModal>
 
+      <ConfirmModal
+        visible={vehicleModalVisible}
+        title={vehicle ? 'Edit Vehicle' : 'Add Vehicle (Optional)'}
+        onCancel={() => setVehicleModalVisible(false)}
+        onDismiss={() => setVehicleModalVisible(false)}
+        fullWidthActions={true}
+        actions={[
+          {
+            text: 'Cancel',
+            variant: 'cancel',
+            onPress: () => setVehicleModalVisible(false),
+          },
+          ...(vehicle
+            ? [
+                {
+                  text: 'Remove',
+                  variant: 'destructive' as const,
+                  onPress: async () => {
+                    if (!idToken || !deviceId) return;
+                    try {
+                      showLoader();
+                      await deleteVehicle(idToken, deviceId);
+                      setVehicle(null);
+                      setVehicleModalVisible(false);
+                    } catch (e: any) {
+                      openAlert(
+                        'Remove failed',
+                        e.message || 'Failed to delete vehicle.'
+                      );
+                    } finally {
+                      hideLoader();
+                    }
+                  },
+                },
+              ]
+            : []),
+          {
+            text: 'Save',
+            variant: 'primary',
+            onPress: async () => {
+              if (!idToken || !deviceId) return;
+              try {
+                showLoader();
+                const body = sanitizeVehicleDraft(vehicleDraft);
+
+                if (body.year && (body.year < 1950 || body.year > 2100)) {
+                  throw new Error('Year must be between 1950 and 2100.');
+                }
+
+                const saved = vehicle
+                  ? await updateVehicle(idToken, deviceId, body)
+                  : await createVehicle(idToken, deviceId, body);
+
+                setVehicle(saved);
+                setVehicleModalVisible(false);
+              } catch (e: any) {
+                openAlert(
+                  'Save failed',
+                  e.message || 'Failed to save vehicle.'
+                );
+              } finally {
+                hideLoader();
+              }
+            },
+          },
+        ]}
+      >
+        <View style={{ marginTop: 8 }}>
+          <HelperBox
+            variant="warning"
+            iconName="info-circle"
+            text="Optional: Add vehicle details to personalize your device. This is not required for tracking."
+          />
+
+          <View style={{ marginBottom: 18 }}>
+            <Text style={{ color: iconMuted, fontSize: 13, fontWeight: '600' }}>
+              Type
+            </Text>
+            <Pressable
+              onPress={() => setVehicleTypeModalVisible(true)}
+              style={{
+                marginTop: 8,
+                height: 48,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: theme === 'light' ? '#d1d5db' : '#3f3f46',
+                paddingHorizontal: 14,
+                backgroundColor: theme === 'light' ? '#ffffff' : '#272727',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Text
+                style={{ color: textColor, fontSize: 16, fontWeight: '600' }}
+              >
+                {vehicleTypeLabel(vehicleDraft.type as VehicleType)}
+              </Text>
+              <FontAwesome
+                name="chevron-down"
+                size={12}
+                color={theme === 'light' ? '#6b7280' : '#9ca3af'}
+              />
+            </Pressable>
+          </View>
+          <AuthTextField
+            label="Nickname"
+            placeholder="My Bike"
+            value={String(vehicleDraft.nickname ?? '')}
+            onChangeText={(v) =>
+              setVehicleDraft((prev) => ({ ...prev, nickname: v }))
+            }
+            autoCapitalize="words"
+          />
+          <AuthTextField
+            label="Make"
+            placeholder="Honda"
+            value={String(vehicleDraft.make ?? '')}
+            onChangeText={(v) =>
+              setVehicleDraft((prev) => ({ ...prev, make: v }))
+            }
+            autoCapitalize="words"
+          />
+          <AuthTextField
+            label="Model"
+            placeholder="Click 125i"
+            value={String(vehicleDraft.model ?? '')}
+            onChangeText={(v) =>
+              setVehicleDraft((prev) => ({ ...prev, model: v }))
+            }
+            autoCapitalize="words"
+          />
+          <AuthTextField
+            label="Year"
+            placeholder="2024"
+            value={
+              vehicleDraft.year === null || vehicleDraft.year === undefined
+                ? ''
+                : String(vehicleDraft.year)
+            }
+            onChangeText={(v) =>
+              setVehicleDraft((prev) => ({
+                ...prev,
+                year: v ? Number(v) : undefined,
+              }))
+            }
+            keyboardType="number-pad"
+            autoCapitalize="none"
+          />
+          <AuthTextField
+            label="Color"
+            placeholder="Black"
+            value={String(vehicleDraft.color ?? '')}
+            onChangeText={(v) =>
+              setVehicleDraft((prev) => ({ ...prev, color: v }))
+            }
+            autoCapitalize="words"
+          />
+          <AuthTextField
+            label="License Plate"
+            placeholder="ABC-1234"
+            value={String(vehicleDraft.license_plate ?? '')}
+            onChangeText={(v) =>
+              setVehicleDraft((prev) => ({ ...prev, license_plate: v }))
+            }
+            autoCapitalize="characters"
+          />
+          <AuthTextField
+            label="VIN"
+            placeholder="(optional)"
+            value={String(vehicleDraft.vin ?? '')}
+            onChangeText={(v) =>
+              setVehicleDraft((prev) => ({ ...prev, vin: v }))
+            }
+            autoCapitalize="characters"
+          />
+        </View>
+      </ConfirmModal>
+
+      <ConfirmModal
+        visible={vehicleTypeModalVisible}
+        title="Select Vehicle Type"
+        onCancel={() => setVehicleTypeModalVisible(false)}
+        onDismiss={() => setVehicleTypeModalVisible(false)}
+        fullWidthActions={true}
+        actions={[
+          ...VEHICLE_TYPES.map((t) => ({
+            text: vehicleTypeLabel(t),
+            variant: (t === vehicleDraft.type
+              ? 'primary'
+              : 'default') as AlertAction['variant'],
+            onPress: () => {
+              setVehicleDraft((prev) => ({ ...prev, type: t }));
+              setVehicleTypeModalVisible(false);
+            },
+          })),
+          {
+            text: 'Cancel',
+            variant: 'cancel' as AlertAction['variant'],
+            onPress: () => setVehicleTypeModalVisible(false),
+          },
+        ]}
+      ></ConfirmModal>
+
       <ScrollView
         contentContainerStyle={{ padding: 16 }}
         refreshControl={
@@ -702,6 +1031,102 @@ export default function DeviceSettingsScreen() {
             showEditButton
             onEditPress={openEditModal}
           />
+        </TitleSection>
+
+        <TitleSection
+          title="Vehicle (Optional)"
+          subtitle="Bind vehicle information to this device"
+        >
+          {vehicleLoading ? (
+            <View
+              style={{
+                backgroundColor: theme === 'light' ? '#fff' : '#1f1f1f',
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: theme === 'light' ? '#e5e7eb' : '#333',
+                padding: 14,
+              }}
+            >
+              <Text style={{ color: iconMuted, fontWeight: '700' }}>
+                Loading vehicle…
+              </Text>
+            </View>
+          ) : vehicle ? (
+            <View
+              style={{
+                backgroundColor: theme === 'light' ? '#fff' : '#1f1f1f',
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: theme === 'light' ? '#e5e7eb' : '#333',
+                padding: 14,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                }}
+              >
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text
+                    style={{
+                      color: textColor,
+                      fontWeight: '800',
+                      fontSize: 15,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {vehicle.nickname ||
+                      [vehicle.make, vehicle.model].filter(Boolean).join(' ') ||
+                      'Vehicle'}
+                  </Text>
+                  <Text
+                    style={{
+                      color: iconMuted,
+                      fontSize: 12,
+                      fontWeight: '600',
+                      marginTop: 2,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {vehicle.type}
+                    {vehicle.year ? ` • ${vehicle.year}` : ''}
+                    {vehicle.license_plate ? ` • ${vehicle.license_plate}` : ''}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={openVehicleModal}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: primaryColor,
+                  }}
+                >
+                  <Text style={{ color: primaryColor, fontWeight: '800' }}>
+                    Edit
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <View style={{ gap: 10 }}>
+              <HelperBox
+                variant="warning"
+                iconName="info-circle"
+                text="Optional: Add vehicle details (type, make, plate) to personalize your device."
+              />
+              <DynamicCard
+                name="Add Vehicle"
+                prefixIcon="car"
+                suffixIcon="chevron-right"
+                onPress={openVehicleModal}
+              />
+            </View>
+          )}
         </TitleSection>
 
         <TitleSection title="Sensor Data">

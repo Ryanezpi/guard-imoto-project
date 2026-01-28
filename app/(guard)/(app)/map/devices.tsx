@@ -5,9 +5,9 @@ import { useDevices } from '@/context/DeviceContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useLoader } from '@/context/LoaderContext';
 import {
-  createDevice,
   getDeviceNFCs,
   getMyAlerts,
+  pairDevice,
 } from '@/services/user.service';
 import AuthTextField from '@/components/ui/forms/AuthTextField';
 import {
@@ -148,14 +148,22 @@ export default function MapDevicesScreen() {
       const parsed = JSON.parse(result.data);
       if (!parsed.device_id) throw new Error('Invalid QR format');
 
-      await createDevice(idToken, {
-        name: parsed.device_name ?? parsed.device_id,
+      await pairDevice(idToken, {
+        device_name: parsed.device_name ?? parsed.device_id,
         serial_number: parsed.device_id,
       });
 
       await refreshDevices(); // refresh context so initial_devices updates
-    } catch (err) {
-      openAlert('Error', 'Failed to add device or invalid QR.');
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      if (msg.toLowerCase().includes('device not found')) {
+        openAlert(
+          'Device not found',
+          'No device matched that serial number. Please double-check the QR code / serial number and try again.'
+        );
+      } else {
+        openAlert('Error', msg || 'Failed to add device or invalid QR.');
+      }
       console.error(err);
     } finally {
       hideLoader();
@@ -177,8 +185,8 @@ export default function MapDevicesScreen() {
     showLoader();
 
     try {
-      await createDevice(idToken, {
-        name: device_name,
+      await pairDevice(idToken, {
+        device_name,
         serial_number,
       });
 
@@ -187,8 +195,16 @@ export default function MapDevicesScreen() {
       setDeviceName('');
       setSerialNumber('');
       setManualAdd(false);
-    } catch (err) {
-      openAlert('Error', 'Failed to add device.');
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      if (msg.toLowerCase().includes('device not found')) {
+        openAlert(
+          'Device not found',
+          'No device matched that serial number. Please check the serial number and try again.'
+        );
+      } else {
+        openAlert('Error', msg || 'Failed to add device.');
+      }
       console.error(err);
     } finally {
       hideLoader();

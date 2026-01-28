@@ -30,13 +30,14 @@ export default function AuthTextField({
   const { theme } = useTheme();
 
   const textColor = theme === 'light' ? '#111827' : '#f9fafb';
-  const subTextColor = theme === 'light' ? '#1C1C1E' : '#9ca3af';
+  const labelColor = theme === 'light' ? '#6b7280' : '#9ca3af';
+  const placeholderColor = theme === 'light' ? '#9ca3af' : '#6b7280';
   const borderColor = theme === 'light' ? '#d1d5db' : '#3f3f46';
   const bgColor = theme === 'light' ? '#ffffff' : '#272727';
 
   return (
     <View style={styles.field}>
-      <Text style={[styles.label, { color: subTextColor }]}>{label}</Text>
+      <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -44,7 +45,7 @@ export default function AuthTextField({
         autoCapitalize={autoCapitalize}
         keyboardType={keyboardType}
         placeholder={placeholder}
-        placeholderTextColor={subTextColor}
+        placeholderTextColor={placeholderColor}
         style={[
           styles.input,
           {

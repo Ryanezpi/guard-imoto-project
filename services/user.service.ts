@@ -25,6 +25,47 @@ export type AlarmConfigBody = {
   relay1_trigger_mode: 'auto' | 'manual' | null;
   relay1_delay_sec: number | null;
 };
+
+export type VehicleType =
+  | 'motorbike'
+  | 'motorcycle'
+  | 'bike'
+  | 'car'
+  | 'scooter'
+  | 'truck'
+  | 'van'
+  | 'other';
+
+export type Vehicle = {
+  id: string;
+  device_id: string;
+  type: VehicleType;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  color: string | null;
+  license_plate: string | null;
+  vin: string | null;
+  nickname: string | null;
+  image_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UpsertVehicleBody = Partial<
+  Pick<
+    Vehicle,
+    | 'type'
+    | 'make'
+    | 'model'
+    | 'year'
+    | 'color'
+    | 'license_plate'
+    | 'vin'
+    | 'nickname'
+    | 'image_url'
+  >
+>;
 export interface AuditLogsResponse {
   success: boolean;
   logs: AuditLog[];
@@ -143,6 +184,48 @@ export async function createDevice(idToken: string, body: CreateDeviceBody) {
   return {
     deviceId: responseBody.serial_number,
     device_color: responseBody.device_color ?? '#E53935', // default red
+    deviceEnabled: responseBody.device_enabled ?? true,
+  } as Device;
+}
+
+export type PairDeviceBody = {
+  device_name: string;
+  serial_number: string;
+};
+
+export async function pairDevice(idToken: string, body: PairDeviceBody) {
+  const response = await fetch(`${API_BASE}/devices/pair`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  let responseBody: any;
+  try {
+    responseBody = await response.json();
+  } catch (err) {
+    console.error('Failed to parse response JSON', err);
+  }
+
+  if (response.status === 404) {
+    // Backend contract: 404 { "message": "Device not found" }
+    throw new Error(responseBody?.message || 'Device not found');
+  }
+
+  if (!response.ok) {
+    console.error('Pair Device Error:', response.status, responseBody);
+    throw new Error(
+      responseBody?.message || `Failed to pair device (${response.status})`
+    );
+  }
+
+  // Keep return shape similar to createDevice for minimal UI changes.
+  return {
+    deviceId: responseBody.serial_number ?? body.serial_number,
+    device_color: responseBody.device_color ?? '#E53935',
     deviceEnabled: responseBody.device_enabled ?? true,
   } as Device;
 }
@@ -479,4 +562,94 @@ export async function getByDeviceId(idToken: string, deviceId: string) {
   }
 
   return res.json();
+}
+
+/* ---------------------------------- */
+/* Vehicles (optional binding)         */
+/* ---------------------------------- */
+export async function getVehicle(idToken: string, deviceId: string) {
+  const res = await fetch(`${API_BASE}/vehicles/${deviceId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
+  });
+
+  // Treat "not found" as "not bound yet"
+  if (res.status === 404) return null;
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    throw new Error(err || 'Failed to fetch vehicle');
+  }
+
+  const data = await res.json().catch(() => null);
+  return (data?.vehicle ?? data) as Vehicle;
+}
+
+export async function createVehicle(
+  idToken: string,
+  deviceId: string,
+  body: UpsertVehicleBody
+) {
+  const res = await fetch(`${API_BASE}/vehicles/${deviceId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    throw new Error(err || 'Failed to create vehicle');
+  }
+
+  const data = await res.json().catch(() => null);
+  return (data?.vehicle ?? data) as Vehicle;
+}
+
+export async function updateVehicle(
+  idToken: string,
+  deviceId: string,
+  body: UpsertVehicleBody
+) {
+  const res = await fetch(`${API_BASE}/vehicles/${deviceId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    throw new Error(err || 'Failed to update vehicle');
+  }
+
+  const data = await res.json().catch(() => null);
+  return (data?.vehicle ?? data) as Vehicle;
+}
+
+export async function deleteVehicle(idToken: string, deviceId: string) {
+  const res = await fetch(`${API_BASE}/vehicles/${deviceId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
+  });
+
+  // Deleting a non-existent vehicle should be a no-op for the UI.
+  if (res.status === 404) return true;
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    throw new Error(err || 'Failed to delete vehicle');
+  }
+
+  return true;
 }
