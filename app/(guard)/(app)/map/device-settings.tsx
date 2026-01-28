@@ -230,6 +230,7 @@ export default function DeviceSettingsScreen() {
     channel: 1 | 2;
     nextValue: boolean;
   }>({ visible: false, channel: 1, nextValue: false });
+  const [unpairConfirmVisible, setUnpairConfirmVisible] = useState(false);
 
   const closeAlert = useCallback(
     () => setAlert((prev) => ({ ...prev, visible: false })),
@@ -256,6 +257,10 @@ export default function DeviceSettingsScreen() {
   );
   const closeRelayConfirm = useCallback(
     () => setRelayConfirm((prev) => ({ ...prev, visible: false })),
+    []
+  );
+  const closeUnpairConfirm = useCallback(
+    () => setUnpairConfirmVisible(false),
     []
   );
 
@@ -1010,7 +1015,58 @@ export default function DeviceSettingsScreen() {
             onPress: () => setVehicleTypeModalVisible(false),
           },
         ]}
-      ></ConfirmModal>
+      >
+        <Text style={{ color: iconMuted, marginTop: 6, lineHeight: 18 }}>
+          Type is stored in lowercase for the API but displayed in sentence case.
+        </Text>
+      </ConfirmModal>
+
+      <ConfirmModal
+        visible={unpairConfirmVisible}
+        title="Unpair device?"
+        onCancel={closeUnpairConfirm}
+        onDismiss={closeUnpairConfirm}
+        fullWidthActions={true}
+        actions={[
+          { text: 'Cancel', variant: 'cancel', onPress: closeUnpairConfirm },
+          {
+            text: 'Unpair',
+            variant: 'destructive',
+            onPress: async () => {
+              if (!idToken || !deviceId) return;
+              closeUnpairConfirm();
+              try {
+                showLoader();
+                await unlinkDevice(idToken, deviceId);
+                await loadTelemetry();
+                await refreshDevices();
+                router.back();
+              } catch (e: any) {
+                openAlert(
+                  'Unpair failed',
+                  e?.message || 'Failed to unpair device.'
+                );
+              } finally {
+                hideLoader();
+              }
+            },
+          },
+        ]}
+      >
+        <HelperBox
+          variant="warning"
+          iconName="exclamation-triangle"
+          text="This is a destructive action. The device will be reset to a system-owned/unpaired state."
+        />
+        <View style={{ marginTop: 10 }}>
+          <Text style={{ color: iconMuted, fontWeight: '700' }}>
+            Device: {device?.name ?? '—'}
+          </Text>
+          <Text style={{ color: iconMuted, marginTop: 2 }}>
+            Serial: {device?.serial ?? '—'}
+          </Text>
+        </View>
+      </ConfirmModal>
 
       <ScrollView
         contentContainerStyle={{ padding: 16 }}
@@ -1022,7 +1078,10 @@ export default function DeviceSettingsScreen() {
           />
         }
       >
-        <TitleSection title="Device Summary">
+        <TitleSection
+          title="Device Summary"
+          subtitle="Quick overview of status, relays, alerts, and linked NFC tags."
+        >
           <DeviceCard
             device={summaryDevice}
             disablePress
@@ -1035,7 +1094,7 @@ export default function DeviceSettingsScreen() {
 
         <TitleSection
           title="Vehicle (Optional)"
-          subtitle="Bind vehicle information to this device"
+          subtitle="Optional: add vehicle details to personalize this device."
         >
           {vehicleLoading ? (
             <View
@@ -1129,7 +1188,10 @@ export default function DeviceSettingsScreen() {
           )}
         </TitleSection>
 
-        <TitleSection title="Sensor Data">
+        <TitleSection
+          title="Sensor Data"
+          subtitle="Latest readings and detections. Tap a row to view history."
+        >
           <View style={{ marginBottom: 8 }}>
             <Text style={{ color: iconMuted, fontSize: 12, lineHeight: 16 }}>
               GPS shows last known location and accuracy. Gyro shows motion
@@ -1346,7 +1408,10 @@ export default function DeviceSettingsScreen() {
         </TitleSection>
 
         {/* DEVICE SETTINGS */}
-        <TitleSection title="Device Settings">
+        <TitleSection
+          title="Device Settings"
+          subtitle="Core configuration for sensors, relays, and NFC linking."
+        >
           <DynamicCard
             name="Link NFC Tag"
             prefixIcon="qrcode"
@@ -1407,7 +1472,7 @@ export default function DeviceSettingsScreen() {
 
         <TitleSection
           title="Alerts"
-          subtitle="Configure when and how you are notified."
+          subtitle="Choose which events create alerts. Requires notifications enabled."
         >
           {!user?.notifications_enabled ? (
             <View
@@ -1481,7 +1546,7 @@ export default function DeviceSettingsScreen() {
         {/* OVERRIDE / TESTING */}
         <TitleSection
           title="Alarm Settings"
-          subtitle="Manual testing and forced actions."
+          subtitle="Siren behavior configuration for relay channel 1."
         >
           <DynamicCard
             name="Alarm Type"
@@ -1517,19 +1582,7 @@ export default function DeviceSettingsScreen() {
           name="Unpair Device"
           prefixIcon="sign-out"
           prefixColor="#ff4d4f"
-          onPress={() => {
-            showLoader();
-            unlinkDevice(idToken!, deviceId!)
-              .catch((e) => {
-                openAlert('Error', `Failed to unpair device: ${e}`);
-              })
-              .then(() => {
-                hideLoader();
-                loadTelemetry();
-                refreshDevices();
-                router.back();
-              });
-          }}
+          onPress={() => setUnpairConfirmVisible(true)}
         />
       </ScrollView>
 

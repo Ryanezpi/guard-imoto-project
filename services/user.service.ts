@@ -358,6 +358,7 @@ export async function unlinkDevice(idToken: string, deviceId: string) {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${idToken}`,
     },
+    body: JSON.stringify({}),
   });
 
   console.log(`Unlinking device: ${deviceId}`);
