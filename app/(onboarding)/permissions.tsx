@@ -3,20 +3,14 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import {
-  Alert,
-  Linking,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  Platform,
-} from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import * as Location from 'expo-location';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import { useLoader } from '@/context/LoaderContext';
+import ConfirmModal, { type AlertAction } from '@/components/ui/forms/ConfirmModal';
 
 const PUSH_TOKEN_KEY = '@expo_push_token';
 
@@ -30,11 +24,7 @@ async function getStoredPushToken() {
 
 async function registerForPushNotificationsAsync(): Promise<string | null> {
   if (!Device.isDevice) {
-    Alert.alert(
-      'Physical device required',
-      'Push notifications only work on a physical device.'
-    );
-    return null;
+    throw new Error('Push notifications only work on a physical device.');
   }
 
   if (Platform.OS === 'android') {
@@ -74,6 +64,20 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
 
 export default function Permissions() {
   const router = useRouter();
+  const { showLoader, hideLoader } = useLoader();
+  const [dialog, setDialog] = React.useState<{
+    visible: boolean;
+    title?: string;
+    message?: string;
+    actions: AlertAction[];
+  }>({
+    visible: false,
+    actions: [],
+  });
+
+  const openDialog = (opts: Omit<typeof dialog, 'visible'>) =>
+    setDialog({ ...opts, visible: true });
+  const closeDialog = () => setDialog((prev) => ({ ...prev, visible: false }));
 
   const finishOnboarding = async () => {
     await AsyncStorage.setItem('@onboarding_complete', 'true');
@@ -82,6 +86,7 @@ export default function Permissions() {
 
   const handleContinue = async () => {
     try {
+      showLoader();
       /* ---------------- Push Notifications ---------------- */
       const pushToken = await registerForPushNotificationsAsync();
       const hasPush = Boolean(pushToken);
@@ -117,21 +122,42 @@ export default function Permissions() {
         return;
       }
 
-      Alert.alert(
-        'Permissions Required',
-        'Please enable Precise Location and Notification access in Settings to protect your vehicle.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: Linking.openSettings },
-        ]
-      );
+      openDialog({
+        title: 'Permissions Required',
+        message:
+          'Please enable Precise Location and Notification access in Settings to protect your vehicle.',
+        actions: [
+          { text: 'Not now', variant: 'cancel', onPress: closeDialog },
+          {
+            text: 'Open Settings',
+            variant: 'primary',
+            onPress: () => {
+              closeDialog();
+              Linking.openSettings();
+            },
+          },
+        ],
+      });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
 
-      Alert.alert('Error', message, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open Settings', onPress: Linking.openSettings },
-      ]);
+      openDialog({
+        title: 'Error',
+        message,
+        actions: [
+          { text: 'Close', variant: 'cancel', onPress: closeDialog },
+          {
+            text: 'Open Settings',
+            variant: 'primary',
+            onPress: () => {
+              closeDialog();
+              Linking.openSettings();
+            },
+          },
+        ],
+      });
+    } finally {
+      hideLoader();
     }
   };
 
@@ -147,13 +173,13 @@ export default function Permissions() {
 
         <View style={styles.listContainer}>
           <PermissionItem
-            icon={<FontAwesome name="map-marker" size={14} color="#2563EB" />}
+            icon={<FontAwesome name="map-marker" size={14} color="#9F0EA1" />}
             title="Location access"
             description="so we can track your motorcycle, detect suspicious movement, and guide recovery if stolen."
           />
 
           <PermissionItem
-            icon={<FontAwesome name="bell" size={14} color="#2563EB" />}
+            icon={<FontAwesome name="bell" size={14} color="#9F0EA1" />}
             title="Notification access"
             description="to alert you instantly about security events and system updates."
           />
@@ -174,6 +200,16 @@ export default function Permissions() {
           <Text style={styles.secondaryButtonText}>Not Now</Text>
         </Pressable>
       </View>
+
+      <ConfirmModal
+        visible={dialog.visible}
+        title={dialog.title}
+        actions={dialog.actions}
+        onCancel={closeDialog}
+        onDismiss={closeDialog}
+      >
+        {dialog.message ? <Text>{dialog.message}</Text> : null}
+      </ConfirmModal>
     </SafeAreaView>
   );
 }
@@ -257,7 +293,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   primaryButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#9F0EA1',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -274,10 +310,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2563EB',
+    borderColor: '#9F0EA1',
   },
   secondaryButtonText: {
-    color: '#2563EB',
+    color: '#9F0EA1',
     fontSize: 18,
     fontWeight: '600',
   },

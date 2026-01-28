@@ -9,6 +9,7 @@ interface HelperBoxProps {
   suffixIcon?: keyof typeof FontAwesome.glyphMap; // optional fixed suffix icon
   iconColor?: string; // optional color override for prefix icon
   suffixColor?: string; // optional color override for suffix icon
+  variant?: 'default' | 'warning';
 }
 
 export default function HelperBox({
@@ -16,25 +17,42 @@ export default function HelperBox({
   iconName = 'info-circle',
   iconColor,
   suffixColor,
+  variant = 'default',
 }: HelperBoxProps) {
   const { theme } = useTheme();
   const borderColor = theme === 'light' ? '#ccc' : '#555';
   const textColor = theme === 'light' ? '#333' : '#eee';
   const finalIconColor = iconColor ?? (theme === 'light' ? '#888' : '#aaa');
 
+  const warningBg = theme === 'light' ? '#FEF3C7' : '#3A2E14';
+  const warningText = theme === 'light' ? '#92400E' : '#FCD34D';
+  const warningIcon = theme === 'light' ? '#92400E' : '#FCD34D';
+
+  const containerStyle =
+    variant === 'warning'
+      ? {
+          backgroundColor: warningBg,
+          borderColor: 'transparent',
+          borderWidth: 0,
+        }
+      : { borderColor };
+  const finalTextColor = variant === 'warning' ? warningText : textColor;
+  const finalIcon =
+    variant === 'warning' ? warningIcon : finalIconColor;
+
   return (
-    <View style={[styles.container, { borderColor }]}>
+    <View style={[styles.container, containerStyle]}>
       {/* Content row */}
       <View style={styles.content}>
         {iconName && (
           <FontAwesome
             name={iconName}
             size={18}
-            color={finalIconColor}
+            color={finalIcon}
             style={styles.prefixIcon}
           />
         )}
-        <Text style={[styles.text, { color: textColor }]}>{text}</Text>
+        <Text style={[styles.text, { color: finalTextColor }]}>{text}</Text>
       </View>
     </View>
   );

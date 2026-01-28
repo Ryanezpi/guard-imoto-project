@@ -171,12 +171,15 @@ export default function EmailVerification() {
                 prefixIcon="sign-out"
                 prefixColor="#ff4d4f"
                 onPress={async () => {
+                  showLoader();
                   try {
                     await signOut(auth);
                     await AsyncStorage.multiRemove(['theme', 'onboardingSeen']);
                     router.replace(ROUTES.AUTH.LOGIN);
                   } catch (err) {
                     console.error('Logout failed', err);
+                  } finally {
+                    hideLoader();
                   }
                 }}
               />
@@ -199,7 +202,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     height: 52,
     borderRadius: 14,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#9F0EA1',
     alignItems: 'center',
     justifyContent: 'center',
   },

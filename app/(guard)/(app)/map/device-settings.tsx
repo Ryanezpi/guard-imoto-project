@@ -1,7 +1,10 @@
 import DynamicCard from '@/components/ui/Card';
-import DevicePrefix from '@/components/ui/DevicePrefix';
-import ConfirmModal from '@/components/ui/forms/ConfirmModal';
+import { DeviceCard } from '@/components/ui/DeviceCard';
+import ConfirmModal, {
+  type AlertAction,
+} from '@/components/ui/forms/ConfirmModal';
 import TitleSection from '@/components/ui/TitleSection';
+import HelperBox from '@/components/ui/HelperBoxProps';
 import { DEVICE_COLORS } from '@/constants/colors';
 import { ROUTES } from '@/constants/routes';
 import { useAuth } from '@/context/AuthContext';
@@ -10,6 +13,8 @@ import { useLoader } from '@/context/LoaderContext';
 import { useTheme } from '@/context/ThemeContext';
 import {
   getDeviceTelemetrySummary,
+  getDeviceNFCs,
+  getMyAlerts,
   patchDeviceConfig,
   unlinkDevice,
 } from '@/services/user.service';
@@ -21,10 +26,10 @@ import {
   TouchableOpacity,
   View,
   Text,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 import { TelemetryModal } from '@/components/ui/TelemetryModal';
 
@@ -154,11 +159,17 @@ function mapStateToPatchConfig(state: DeviceState) {
 export default function DeviceSettingsScreen() {
   const { showLoader, hideLoader } = useLoader();
   const { theme } = useTheme();
-  const { idToken } = useAuth();
+  const { idToken, user } = useAuth();
   const { refreshDevices } = useDevices();
 
   const bgColor = theme === 'light' ? '#f0f0f0' : '#272727';
   const textColor = theme === 'light' ? '#000' : '#fff';
+  const warningBg = theme === 'light' ? '#FEF3C7' : '#3A2E14';
+  const warningText = theme === 'light' ? '#92400E' : '#FCD34D';
+  const primaryColor = theme === 'light' ? '#9F0EA1' : '#C06BD6';
+  const iconMuted = theme === 'light' ? '#6b7280' : '#9ca3af';
+  const datePillBg = theme === 'light' ? '#e5e7eb' : '#2a2a2a';
+  const datePillText = theme === 'light' ? '#374151' : '#d1d5db';
 
   const params = useGlobalSearchParams() as Record<string, string | undefined>;
   const deviceId = params.device_id;
@@ -171,6 +182,9 @@ export default function DeviceSettingsScreen() {
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [telemetry, setTelemetry] = useState<TelemetrySummary | null>(null);
+  const [unresolvedCount, setUnresolvedCount] = useState(0);
+  const [nfcCount, setNfcCount] = useState<number | undefined>(undefined);
+  const [nfcLoading, setNfcLoading] = useState(false);
 
   const updateDraft = (updater: (d: DeviceState) => DeviceState) => {
     setDraft((prev) => (prev ? updater(prev) : prev));
@@ -178,6 +192,42 @@ export default function DeviceSettingsScreen() {
   const [telemetryModal, setTelemetryModal] = useState<{
     type: 'gps' | 'gyro' | 'rfid' | 'detections' | null;
   }>({ type: null });
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    title?: string;
+    message?: string;
+    actions: AlertAction[];
+  }>({ visible: false, actions: [] });
+  const [relayConfirm, setRelayConfirm] = useState<{
+    visible: boolean;
+    channel: 1 | 2;
+    nextValue: boolean;
+  }>({ visible: false, channel: 1, nextValue: false });
+
+  const closeAlert = useCallback(
+    () => setAlert((prev) => ({ ...prev, visible: false })),
+    []
+  );
+  const openAlert = useCallback(
+    (title: string, message: string, actions?: AlertAction[]) =>
+      setAlert({
+        visible: true,
+        title,
+        message,
+        actions: actions ?? [
+          { text: 'OK', variant: 'primary', onPress: closeAlert },
+        ],
+      }),
+    [closeAlert]
+  );
+
+  const requestRelayConfirm = useCallback((channel: 1 | 2, nextValue: boolean) => {
+    setRelayConfirm({ visible: true, channel, nextValue });
+  }, []);
+  const closeRelayConfirm = useCallback(
+    () => setRelayConfirm((prev) => ({ ...prev, visible: false })),
+    []
+  );
 
   const openTelemetryModal = (type: TelemetryType) => {
     setTelemetryModal({ type });
@@ -185,10 +235,39 @@ export default function DeviceSettingsScreen() {
 
   const loadTelemetry = useCallback(async () => {
     try {
+      if (!idToken || !deviceId) return;
       const res = await getDeviceTelemetrySummary(idToken!, deviceId!);
       setTelemetry(res || []);
     } catch (e) {
       console.error('[TELEMETRY]', e);
+    }
+  }, [deviceId, idToken]);
+
+  const loadAlerts = useCallback(async () => {
+    try {
+      if (!idToken || !deviceId) return;
+      const res = await getMyAlerts(idToken);
+      const unresolved =
+        res?.alerts?.filter(
+          (a: any) => a.device_id === deviceId && !a.resolved
+        ) ?? [];
+      setUnresolvedCount(unresolved.length);
+    } catch (e) {
+      console.error('[ALERTS]', e);
+    }
+  }, [deviceId, idToken]);
+
+  const loadNfcCount = useCallback(async () => {
+    try {
+      if (!idToken || !deviceId) return;
+      setNfcLoading(true);
+      const res = await getDeviceNFCs(idToken, deviceId);
+      setNfcCount(res?.length ?? 0);
+    } catch (e) {
+      console.error('[NFC]', e);
+      setNfcCount(undefined);
+    } finally {
+      setNfcLoading(false);
     }
   }, [deviceId, idToken]);
 
@@ -199,6 +278,8 @@ export default function DeviceSettingsScreen() {
       try {
         showLoader();
         await loadTelemetry();
+        await loadAlerts();
+        await loadNfcCount();
       } finally {
         if (mounted) hideLoader();
       }
@@ -207,7 +288,7 @@ export default function DeviceSettingsScreen() {
     return () => {
       mounted = false;
     };
-  }, [hideLoader, loadTelemetry, showLoader]);
+  }, [hideLoader, loadAlerts, loadTelemetry, loadNfcCount, showLoader]);
 
   const openEditModal = () => {
     setDraft(structuredClone(device));
@@ -219,6 +300,8 @@ export default function DeviceSettingsScreen() {
       setRefreshing(true);
 
       await loadTelemetry();
+      await loadAlerts();
+      await loadNfcCount();
       await refreshDevices();
     } finally {
       setRefreshing(false);
@@ -336,7 +419,7 @@ export default function DeviceSettingsScreen() {
         await refreshDevices();
       } catch (e: any) {
         setDevice(snapshot!);
-        Alert.alert('Sync failed', e.message);
+        openAlert('Sync failed', e.message);
       } finally {
         hideLoader();
       }
@@ -369,6 +452,69 @@ export default function DeviceSettingsScreen() {
       </SafeAreaView>
     );
   }
+
+  const summaryDevice = {
+    device_id: deviceId ?? '',
+    device_name: device.name,
+    serial_number: device.serial ?? '',
+    device_color: device.color,
+    paired: device.enabled,
+    relay1_enabled: device.relays.siren.enabled,
+    relay2_enabled: device.relays.ignition,
+    gps_alerts: device.gps_alerts,
+    gyro_alerts: device.gyro_alerts,
+    rfid_alerts: device.rfid_alerts,
+    sms_alerts_enabled: device.sms_alerts_enabled,
+  };
+
+  const renderSensorIcon = (
+    icon: keyof typeof FontAwesome.glyphMap,
+    color: string
+  ) => (
+    <View
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: `${color}22`,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <FontAwesome name={icon} size={14} color={color} />
+    </View>
+  );
+
+  const formatDateTime = (value: string) =>
+    new Date(value).toLocaleDateString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    }) + ` ${new Date(value).toLocaleTimeString()}`;
+
+  const renderTimestampRow = (label: string, recordedAt?: string) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <Text style={{ color: iconMuted, fontSize: 12, fontWeight: '600' }}>
+        {label}
+      </Text>
+      {recordedAt ? (
+        <View
+          style={{
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 999,
+            backgroundColor: datePillBg,
+          }}
+        >
+          <Text
+            style={{ color: datePillText, fontSize: 12, fontWeight: '600' }}
+          >
+            {formatDateTime(recordedAt)}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: bgColor }}
@@ -401,7 +547,7 @@ export default function DeviceSettingsScreen() {
             setShowEditModal(false);
           } catch (e: any) {
             hideLoader();
-            Alert.alert('Update failed', e.message);
+            openAlert('Update failed', e.message);
           } finally {
             hideLoader();
           }
@@ -490,30 +636,135 @@ export default function DeviceSettingsScreen() {
         />
       </ConfirmModal>
 
+      <ConfirmModal
+        visible={relayConfirm.visible}
+        title={`Confirm Relay Channel ${relayConfirm.channel}`}
+        fullWidthActions={true}
+        onCancel={closeRelayConfirm}
+        onDismiss={closeRelayConfirm}
+        actions={[
+          { text: 'Cancel', variant: 'cancel', onPress: closeRelayConfirm },
+          {
+            text: relayConfirm.nextValue ? 'Enable' : 'Disable',
+            variant: relayConfirm.nextValue ? 'primary' : 'destructive',
+            onPress: () => {
+              const { channel, nextValue } = relayConfirm;
+              closeRelayConfirm();
+
+              if (channel === 1) {
+                updateAndSync((d) => ({
+                  ...d,
+                  relays: {
+                    ...d.relays,
+                    siren: { ...d.relays.siren, enabled: nextValue },
+                  },
+                }));
+              } else {
+                updateAndSync((d) => ({
+                  ...d,
+                  relays: { ...d.relays, ignition: nextValue },
+                }));
+              }
+            },
+          },
+        ]}
+      >
+        <Text style={{ color: iconMuted, marginTop: 6, lineHeight: 18 }}>
+          {relayConfirm.channel === 1
+            ? 'Relay Channel 1 controls the siren output. Enabling it may activate the siren depending on your device configuration.'
+            : 'Relay Channel 2 controls the ignition output. Enabling it may affect your vehicle ignition depending on wiring.'}
+        </Text>
+        <View style={{ marginTop: 10 }}>
+          <HelperBox
+            variant="warning"
+            iconName="exclamation-triangle"
+            text="To prevent accidental changes, please confirm before applying."
+          />
+        </View>
+      </ConfirmModal>
+
       <ScrollView
         contentContainerStyle={{ padding: 16 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={theme === 'light' ? '#000' : '#fff'}
+            tintColor={primaryColor}
           />
         }
       >
+        <TitleSection title="Device Summary">
+          <DeviceCard
+            device={summaryDevice}
+            disablePress
+            unresolvedCount={unresolvedCount}
+            nfcCount={nfcLoading ? undefined : nfcCount}
+            showEditButton
+            onEditPress={openEditModal}
+          />
+        </TitleSection>
+
         <TitleSection title="Sensor Data">
+          <View style={{ marginBottom: 8 }}>
+            <Text style={{ color: iconMuted, fontSize: 12, lineHeight: 16 }}>
+              GPS shows last known location and accuracy. Gyro shows motion
+              spikes (higher means stronger impact). RFID shows last scanned tag
+              UID.
+            </Text>
+          </View>
           {/* GPS */}
           <DynamicCard
             name="GPS"
-            prefixIcon="map-marker"
-            subText={
-              telemetry?.gps
-                ? `Last fix • ${new Date(telemetry.gps.recorded_at).toLocaleTimeString()}`
-                : 'No data'
-            }
-            suffixText={
-              telemetry?.gps?.accuracy
-                ? `±${telemetry.gps.accuracy}m`
-                : undefined
+            prefixElement={renderSensorIcon('map-marker', primaryColor)}
+            subTextElement={renderTimestampRow(
+              'Last fix',
+              telemetry?.gps?.recorded_at
+            )}
+            suffixElement={
+              telemetry?.gps ? (
+                <View
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 999,
+                    backgroundColor: `${primaryColor}22`,
+                    marginRight: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: primaryColor,
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {telemetry.gps.accuracy
+                      ? `±${telemetry.gps.accuracy}m`
+                      : `${telemetry.gps.lat.toFixed(3)}, ${telemetry.gps.lng.toFixed(3)}`}
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 999,
+                    backgroundColor:
+                      theme === 'light' ? '#ef444422' : '#ef444433',
+                    marginRight: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#ef4444',
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    No Fix
+                  </Text>
+                </View>
+              )
             }
             onPress={() => openTelemetryModal('gps')}
           />
@@ -521,20 +772,58 @@ export default function DeviceSettingsScreen() {
           {/* Gyro */}
           <DynamicCard
             name="Gyroscope"
-            prefixIcon="balance-scale"
-            subText={
-              telemetry?.gyro
-                ? `Last movement • ${new Date(telemetry.gyro.recorded_at).toLocaleTimeString()}`
-                : 'No data'
-            }
-            suffixText={
-              telemetry?.gyro
-                ? Math.sqrt(
-                    telemetry.gyro.x ** 2 +
-                      telemetry.gyro.y ** 2 +
-                      telemetry.gyro.z ** 2
-                  ).toFixed(2)
-                : undefined
+            prefixElement={renderSensorIcon('bullseye', '#E53935')}
+            subTextElement={renderTimestampRow(
+              'Last movement',
+              telemetry?.gyro?.recorded_at
+            )}
+            suffixElement={
+              telemetry?.gyro ? (
+                <View
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 999,
+                    backgroundColor: '#E5393522',
+                    marginRight: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#E53935',
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {Math.sqrt(
+                      telemetry.gyro.x ** 2 +
+                        telemetry.gyro.y ** 2 +
+                        telemetry.gyro.z ** 2
+                    ).toFixed(2)}
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 999,
+                    backgroundColor:
+                      theme === 'light' ? '#ef444422' : '#ef444433',
+                    marginRight: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#ef4444',
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    No Data
+                  </Text>
+                </View>
+              )
             }
             onPress={() => openTelemetryModal('gyro')}
           />
@@ -542,11 +831,54 @@ export default function DeviceSettingsScreen() {
           {/* RFID */}
           <DynamicCard
             name="RFID"
-            prefixIcon="qrcode"
-            subText={
-              telemetry?.rfid
-                ? `Last scan • ${telemetry.rfid.tag_uid}`
-                : 'No scans yet'
+            prefixElement={renderSensorIcon('id-card', '#8E24AA')}
+            subTextElement={renderTimestampRow(
+              'Last scan',
+              telemetry?.rfid?.recorded_at
+            )}
+            suffixElement={
+              telemetry?.rfid ? (
+                <View
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 999,
+                    backgroundColor: '#8E24AA22',
+                    marginRight: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#8E24AA',
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {telemetry.rfid.tag_uid}
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 999,
+                    backgroundColor:
+                      theme === 'light' ? '#ef444422' : '#ef444433',
+                    marginRight: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#ef4444',
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    No Scan
+                  </Text>
+                </View>
+              )
             }
             onPress={() => openTelemetryModal('rfid')}
           />
@@ -554,24 +886,42 @@ export default function DeviceSettingsScreen() {
           {/* Alerts */}
           <DynamicCard
             name="Detections (24h)"
-            prefixIcon="warning"
+            prefixElement={renderSensorIcon('bell', primaryColor)}
             subText={`${telemetry?.detections_24h ?? 0} events`}
+            suffixElement={
+              unresolvedCount > 0 ? (
+                <View
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 999,
+                    backgroundColor:
+                      theme === 'light' ? '#ef444422' : '#ef444433',
+                    marginRight: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#ef4444',
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {unresolvedCount} unresolved
+                  </Text>
+                </View>
+              ) : (
+                <Text style={{ color: iconMuted, fontSize: 12 }}>
+                  No unresolved
+                </Text>
+              )
+            }
             onPress={() => openTelemetryModal('detections')}
           />
         </TitleSection>
 
         {/* DEVICE SETTINGS */}
         <TitleSection title="Device Settings">
-          <DynamicCard
-            name={device.name + ' - ' + device.serial}
-            nameTextBold
-            subText={device.enabled ? 'Enabled' : 'Disabled'}
-            subTextColor={device.enabled ? '#2fa500ff' : '#ff3b30ff'}
-            prefixElement={<DevicePrefix color={device.color} />}
-            suffixIcon="edit"
-            onPress={openEditModal}
-          />
-
           <DynamicCard
             name="Link NFC Tag"
             prefixIcon="qrcode"
@@ -618,18 +968,7 @@ export default function DeviceSettingsScreen() {
             prefixIcon="bullhorn"
             toggle
             toggleValue={device.relays.siren.enabled}
-            onToggle={(v) =>
-              updateAndSync((d) => ({
-                ...d,
-                relays: {
-                  ...d.relays,
-                  siren: {
-                    ...d.relays.siren,
-                    enabled: v,
-                  },
-                },
-              }))
-            }
+            onToggle={(v) => requestRelayConfirm(1, v)}
           />
 
           <DynamicCard
@@ -637,12 +976,7 @@ export default function DeviceSettingsScreen() {
             prefixIcon="bolt"
             toggle
             toggleValue={device.relays.ignition}
-            onToggle={(v) =>
-              updateAndSync((d) => ({
-                ...d,
-                relays: { ...d.relays, ignition: v },
-              }))
-            }
+            onToggle={(v) => requestRelayConfirm(2, v)}
           />
         </TitleSection>
 
@@ -650,49 +984,78 @@ export default function DeviceSettingsScreen() {
           title="Alerts"
           subtitle="Configure when and how you are notified."
         >
-          {(['gyro_alerts', 'gps_alerts', 'rfid_alerts'] as const).map(
-            (key) => (
+          {!user?.notifications_enabled ? (
+            <View
+              style={{
+                backgroundColor: warningBg,
+                padding: 12,
+                borderRadius: 10,
+                marginBottom: 12,
+              }}
+            >
+              <Text style={{ color: warningText, fontWeight: '700' }}>
+                Notifications are disabled
+              </Text>
+              <Text style={{ color: warningText, marginTop: 4 }}>
+                Alerts are hidden. Enable notifications to receive device alerts
+                and configure alert settings.
+              </Text>
+              <View style={{ marginTop: 10 }}>
+                <DynamicCard
+                  name="Enable Notifications"
+                  prefixIcon="bell"
+                  suffixIcon="chevron-right"
+                  onPress={() => router.navigate(ROUTES.APP.SETTINGS)}
+                />
+              </View>
+            </View>
+          ) : (
+            <>
+              {(['gyro_alerts', 'gps_alerts', 'rfid_alerts'] as const).map(
+                (key) => (
+                  <DynamicCard
+                    key={key}
+                    name={
+                      key === 'rfid_alerts'
+                        ? 'RFID Alerts'
+                        : key === 'gps_alerts'
+                          ? 'GPS Alerts'
+                          : 'Gyro Alerts'
+                    }
+                    prefixIcon={
+                      key === 'rfid_alerts'
+                        ? 'warning'
+                        : key === 'gps_alerts'
+                          ? 'map'
+                          : 'arrows'
+                    }
+                    toggle
+                    toggleValue={device[key]}
+                    onToggle={(v) =>
+                      updateAndSync((d) => ({
+                        ...d,
+                        [key]: v, // directly update flat field
+                      }))
+                    }
+                  />
+                )
+              )}
               <DynamicCard
-                key={key}
-                name={
-                  key === 'rfid_alerts'
-                    ? 'RFID Alerts'
-                    : key === 'gps_alerts'
-                      ? 'GPS Alerts'
-                      : 'Gyro Alerts'
-                }
-                prefixIcon={
-                  key === 'rfid_alerts'
-                    ? 'warning'
-                    : key === 'gps_alerts'
-                      ? 'map'
-                      : 'arrows'
-                }
+                name="SMS Alerts"
+                prefixIcon="envelope"
                 toggle
-                toggleValue={device[key]}
+                toggleValue={device.sms_alerts_enabled}
                 onToggle={(v) =>
-                  updateAndSync((d) => ({
-                    ...d,
-                    [key]: v, // directly update flat field
-                  }))
+                  updateAndSync((d) => ({ ...d, sms_alerts_enabled: v }))
                 }
               />
-            )
+            </>
           )}
-          <DynamicCard
-            name="SMS Alerts"
-            prefixIcon="envelope"
-            toggle
-            toggleValue={device.sms_alerts_enabled}
-            onToggle={(v) =>
-              updateAndSync((d) => ({ ...d, sms_alerts_enabled: v }))
-            }
-          />
         </TitleSection>
 
         {/* OVERRIDE / TESTING */}
         <TitleSection
-          title="Override & Testing"
+          title="Alarm Settings"
           subtitle="Manual testing and forced actions."
         >
           <DynamicCard
@@ -733,7 +1096,7 @@ export default function DeviceSettingsScreen() {
             showLoader();
             unlinkDevice(idToken!, deviceId!)
               .catch((e) => {
-                Alert.alert('Error', `Failed to unpair device: ${e}`);
+                openAlert('Error', `Failed to unpair device: ${e}`);
               })
               .then(() => {
                 hideLoader();
@@ -744,6 +1107,16 @@ export default function DeviceSettingsScreen() {
           }}
         />
       </ScrollView>
+
+      <ConfirmModal
+        visible={alert.visible}
+        title={alert.title}
+        actions={alert.actions}
+        onCancel={closeAlert}
+        onDismiss={closeAlert}
+      >
+        {alert.message ? <Text>{alert.message}</Text> : null}
+      </ConfirmModal>
     </SafeAreaView>
   );
 }

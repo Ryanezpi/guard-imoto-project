@@ -60,11 +60,12 @@ export async function getMeAPI(token: string) {
 export async function updateProfile(
   token: string,
   payload: {
-    first_name: string;
-    last_name: string;
-    phone: string;
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
     photo_url?: string;
     expo_token?: string | null;
+    notifications_enabled?: boolean;
   }
 ) {
   const res = await fetch(`${API_BASE}/users/me`, {
@@ -351,6 +352,25 @@ export async function getMyAlerts(token: string) {
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.message || 'Failed to fetch alerts');
+  }
+
+  return res.json();
+}
+
+/**
+ * Resolve a specific alert
+ */
+export async function resolveAlert(token: string, alertId: string) {
+  const res = await fetch(`${API_BASE}/alerts/${alertId}/resolve`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || 'Failed to resolve alert');
   }
 
   return res.json();

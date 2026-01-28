@@ -27,12 +27,23 @@ export function TelemetryModal({
   const { theme } = useTheme();
 
   if (!type) return null;
+  type NonNullTelemetryType = Exclude<TelemetryType, null>;
 
   // ---- Theme-derived colors (single source of truth)
   const bgColor = theme === 'light' ? '#ffffff' : '#1d1d1d';
   const textColor = theme === 'light' ? '#111111' : '#f5f5f5';
   const borderColor = theme === 'light' ? '#e0e0e0' : '#2a2a2a';
   const mutedTextColor = theme === 'light' ? '#999' : '#aaa';
+  const noteTextColor = theme === 'light' ? '#6b7280' : '#9ca3af';
+
+  const notes: Record<NonNullTelemetryType, string> = {
+    gps: 'GPS shows last fix time and accuracy (lower meters = better).',
+    gyro:
+      'Gyro shows motion spikes. Higher magnitude = stronger impact or movement.',
+    rfid: 'RFID shows the last scanned tag UID and time.',
+    detections:
+      'Detections are generated from GPS/Gyro/RFID rules. Each entry may create an alert (Active/Resolved).',
+  };
 
   const commonProps = { deviceId, idToken, realtime };
 
@@ -63,10 +74,19 @@ export function TelemetryModal({
               {type.toUpperCase()} Telemetry
             </Text>
 
-            <TouchableOpacity onPress={onClose}>
-              <Text style={{ color: mutedTextColor, fontSize: 18 }}>✕</Text>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={{ color: mutedTextColor, fontSize: 20 }}>✕</Text>
             </TouchableOpacity>
           </View>
+          {notes[type] ? (
+            <Text style={[styles.note, { color: noteTextColor }]}>
+              {notes[type]}
+            </Text>
+          ) : null}
 
           {/* Content */}
           <View style={[styles.content, { borderTopColor: borderColor }]}>
@@ -98,5 +118,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: { fontSize: 16, fontWeight: '600' },
+  note: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  closeButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
   content: { padding: 16, borderTopWidth: 1 },
 });

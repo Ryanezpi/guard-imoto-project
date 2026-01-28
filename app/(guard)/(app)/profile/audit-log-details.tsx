@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import DynamicCard from '@/components/ui/Card';
+import DateTimePill from '@/components/ui/DateTimePill';
 
 type AuditLog = {
   id: string;
@@ -92,11 +93,7 @@ export default function AuditLogDetailsScreen() {
         <DynamicCard
           name="Date"
           nameTextBold={true}
-          value={
-            new Date(log.created_at).toDateString() +
-            ' - ' +
-            new Date(log.created_at).toLocaleTimeString()
-          }
+          subTextElement={<DateTimePill value={log.created_at} />}
         />
 
         {/* Metadata */}

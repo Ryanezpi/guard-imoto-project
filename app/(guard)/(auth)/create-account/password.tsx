@@ -199,12 +199,12 @@ const styles = StyleSheet.create({
   toggle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2563EB',
+    color: '#9F0EA1',
     paddingLeft: 12,
   },
 
   primaryButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#9F0EA1',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -222,10 +222,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2563EB',
+    borderColor: '#9F0EA1',
   },
   secondaryButtonText: {
-    color: '#2563EB',
+    color: '#9F0EA1',
     fontSize: 18,
     fontWeight: '600',
   },

@@ -13,12 +13,14 @@ import {
 
 interface DynamicCardProps {
   name: string;
+  nameElement?: React.ReactNode;
   nameTextBold?: boolean;
 
   value?: string;
   onChange?: (value: string) => void;
   subText?: string | number;
   subTextColor?: string;
+  subTextElement?: React.ReactNode;
 
   /** PREFIX OPTIONS */
   prefixIcon?: keyof typeof FontAwesome.glyphMap;
@@ -40,6 +42,7 @@ interface DynamicCardProps {
   suffixText?: string | number;
   suffixTextColor?: string;
   suffixTextSize?: number;
+  suffixElement?: React.ReactNode;
 
   expandable?: boolean;
   expanded?: boolean;
@@ -50,10 +53,12 @@ interface DynamicCardProps {
 
 export default function DynamicCard({
   name,
+  nameElement,
   value,
   onChange,
   subText,
   subTextColor,
+  subTextElement,
   nameTextBold: subTextBold = false,
   prefixIcon,
   prefixElement,
@@ -71,6 +76,7 @@ export default function DynamicCard({
   suffixText,
   suffixTextColor,
   suffixTextSize = 13,
+  suffixElement,
   expandable = false,
   expanded: expandedProp,
   customBgColor,
@@ -133,16 +139,20 @@ export default function DynamicCard({
         {renderPrefix()}
 
         <View style={styles.textColumn}>
-          <Text
-            style={{
-              fontSize: nameFontSize,
-              fontFamily: nameFontFamily,
-              color: textColor,
-              fontWeight: subTextBold ? 'bold' : 'normal',
-            }}
-          >
-            {name}
-          </Text>
+          {nameElement ? (
+            nameElement
+          ) : (
+            <Text
+              style={{
+                fontSize: nameFontSize,
+                fontFamily: nameFontFamily,
+                color: textColor,
+                fontWeight: subTextBold ? 'bold' : 'normal',
+              }}
+            >
+              {name}
+            </Text>
+          )}
 
           {editable ? (
             <TextInput
@@ -162,6 +172,8 @@ export default function DynamicCard({
             <Text style={{ fontSize: nameFontSize * 0.85, color: textColor }}>
               {value}
             </Text>
+          ) : subTextElement ? (
+            subTextElement
           ) : subText !== undefined ? (
             <Text
               style={{
@@ -179,12 +191,13 @@ export default function DynamicCard({
             <Switch
               value={toggleValue}
               onValueChange={onToggle}
-              trackColor={{ false: '#ccc', true: '#4e8cff' }}
+              trackColor={{ false: '#ccc', true: '#B874DB' }}
               thumbColor="#fff"
               ios_backgroundColor="#3e3e3e"
             />
           ) : (
             <>
+              {suffixElement}
               {suffixText !== undefined && (
                 <Text
                   style={{

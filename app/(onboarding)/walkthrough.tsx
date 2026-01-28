@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   button: {
-    backgroundColor: '#2563EB', // The purple from your image
+    backgroundColor: '#9F0EA1', // The purple from your image
     width: '100%',
     paddingVertical: 16,
     borderRadius: 12,
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   link: {
-    color: '#2563EB',
+    color: '#9F0EA1',
     textDecorationLine: 'none',
   },
 });

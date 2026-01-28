@@ -15,7 +15,12 @@ import { useLoader } from './LoaderContext';
 import { ROUTES } from '@/constants/routes';
 import { router } from 'expo-router';
 
-type Status = 'checking' | 'unauthenticated' | 'authenticated' | 'new-user';
+type Status =
+  | 'checking'
+  | 'unauthenticated'
+  | 'authenticated'
+  | 'new-user'
+  | 'email-unverified';
 
 export type User = {
   id: string;
@@ -75,10 +80,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /* Refresh backend user               */
   /* ---------------------------------- */
   const refreshUser = useCallback(async () => {
-    if (!idToken) return null;
-
     try {
       const token = await getFreshIdToken();
+      await SecureStore.setItemAsync(TOKEN_KEY, token);
+      setIdToken(token);
+
       const me = await getMeAPI(token);
       const expoToken = await getStoredExpoToken();
 
@@ -99,12 +105,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return me;
     } catch (err: any) {
       console.log('Failed to refresh user:', err);
-      if (err.status === 401) {
-        return await refreshUser();
-      }
+      if (err.status === 401) return null;
       return null;
     }
-  }, [hideLoader, idToken]);
+  }, [hideLoader]);
 
   /* ---------------------------------- */
   /* Handle Firebase auth changes        */
@@ -125,8 +129,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const me = await getMeAPI(fbUser ? await fbUser.getIdToken() : '');
 
         if (!fbUser.emailVerified) {
+          const token = await getFreshIdToken();
+          await SecureStore.setItemAsync(TOKEN_KEY, token);
+          setIdToken(token);
           setUser(me);
-          setStatus('unauthenticated');
+          setStatus('email-unverified');
           router.replace(ROUTES.AUTH.CREATE_ACCOUNT.EMAIL_VERIFICATION);
           hideLoader();
           console.log('User email not verified:', fbUser.email);
@@ -151,7 +158,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setStatus('authenticated');
 
           router.replace(ROUTES.APP.MAP);
-          console.log('Authenticated user:', me);
+          console.log('[Auth] User snapshot on init', {
+            id: me.id,
+            firebase_uid: me.firebase_uid,
+            first_name: me.first_name,
+            last_name: me.last_name,
+            email: me.email,
+            phone: me.phone,
+            photo_url: me.photo_url,
+            notifications_enabled: me.notifications_enabled,
+            expo_push_token: me.expo_push_token,
+          });
           hideLoader();
           scheduleTokenRefresh();
         } catch (err) {

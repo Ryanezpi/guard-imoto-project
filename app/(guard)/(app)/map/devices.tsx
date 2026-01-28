@@ -3,38 +3,44 @@ import { DeviceCard } from '@/components/ui/DeviceCard';
 import { useAuth } from '@/context/AuthContext';
 import { useDevices } from '@/context/DeviceContext';
 import { useTheme } from '@/context/ThemeContext';
-import { createDevice } from '@/services/user.service';
+import { useLoader } from '@/context/LoaderContext';
+import {
+  createDevice,
+  getDeviceNFCs,
+  getMyAlerts,
+} from '@/services/user.service';
+import AuthTextField from '@/components/ui/forms/AuthTextField';
 import {
   BarcodeScanningResult,
   CameraType,
   CameraView,
   useCameraPermissions,
 } from 'expo-camera';
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   View,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ConfirmModal, {
+  type AlertAction,
+} from '@/components/ui/forms/ConfirmModal';
 
 export default function MapDevicesScreen() {
   const { theme } = useTheme();
   const { idToken } = useAuth();
   const { devices: initial_devices, refreshDevices } = useDevices();
+  const { showLoader, hideLoader } = useLoader();
 
   const bgColor = theme === 'light' ? '#f0f0f0' : '#272727';
-  const cardColor = theme === 'light' ? '#ffffff' : '#1f1f1f';
   const textColor = theme === 'light' ? '#111827' : '#f9fafb';
-  const subTextColor = theme === 'light' ? '#1C1C1E' : '#9ca3af';
-  const borderColor = theme === 'light' ? '#d1d5db' : '#3f3f46';
+  const primaryColor = theme === 'light' ? '#9F0EA1' : '#C06BD6';
 
   const [scanning, setScanning] = useState(false);
   const [manualAdd, setManualAdd] = useState(false);
@@ -47,15 +53,88 @@ export default function MapDevicesScreen() {
   const [addingDevice, setAddingDevice] = useState(false);
 
   const [refreshing, setRefreshing] = useState(false);
+  const [unresolvedByDevice, setUnresolvedByDevice] = useState<
+    Record<string, number>
+  >({});
+  const [nfcByDevice, setNfcByDevice] = useState<Record<string, number>>({});
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    title?: string;
+    message?: string;
+    actions: AlertAction[];
+  }>({ visible: false, actions: [] });
+
+  const closeAlert = useCallback(
+    () => setAlert((prev) => ({ ...prev, visible: false })),
+    []
+  );
+  const openAlert = useCallback(
+    (title: string, message: string, actions?: AlertAction[]) =>
+      setAlert({
+        visible: true,
+        title,
+        message,
+        actions: actions ?? [
+          { text: 'OK', variant: 'primary', onPress: closeAlert },
+        ],
+      }),
+    [closeAlert]
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
+    showLoader();
     try {
+      await loadAlerts();
+      await loadNfcCounts();
       await refreshDevices();
     } finally {
+      hideLoader();
       setRefreshing(false);
     }
   };
+
+  const loadAlerts = useCallback(async () => {
+    if (!idToken) return;
+    try {
+      const res = await getMyAlerts(idToken);
+      const counts: Record<string, number> = {};
+      (res.alerts || []).forEach((alert: any) => {
+        if (!alert.resolved && alert.device_id) {
+          counts[alert.device_id] = (counts[alert.device_id] || 0) + 1;
+        }
+      });
+      setUnresolvedByDevice(counts);
+    } catch (e) {
+      console.error('[ALERTS]', e);
+    }
+  }, [idToken]);
+
+  const loadNfcCounts = useCallback(async () => {
+    if (!idToken || !initial_devices?.length) return;
+    try {
+      const entries = await Promise.all(
+        initial_devices.map(async (device) => {
+          try {
+            const res = await getDeviceNFCs(idToken, device.device_id);
+            return [device.device_id, res?.length ?? 0] as const;
+          } catch (e) {
+            console.error('[NFC]', device.device_id, e);
+            return [device.device_id, 0] as const;
+          }
+        })
+      );
+      setNfcByDevice(Object.fromEntries(entries));
+    } catch (e) {
+      console.error('[NFC]', e);
+      setNfcByDevice({});
+    }
+  }, [idToken, initial_devices]);
+
+  useEffect(() => {
+    loadAlerts();
+    loadNfcCounts();
+  }, [loadAlerts, loadNfcCounts]);
 
   // -----------------------------
   // QR scanning
@@ -64,6 +143,7 @@ export default function MapDevicesScreen() {
     if (processingScan || !idToken) return;
     setProcessingScan(true);
 
+    showLoader();
     try {
       const parsed = JSON.parse(result.data);
       if (!parsed.device_id) throw new Error('Invalid QR format');
@@ -75,9 +155,10 @@ export default function MapDevicesScreen() {
 
       await refreshDevices(); // refresh context so initial_devices updates
     } catch (err) {
-      Alert.alert('Error', 'Failed to add device or invalid QR.');
+      openAlert('Error', 'Failed to add device or invalid QR.');
       console.error(err);
     } finally {
+      hideLoader();
       setScanning(false);
       setTimeout(() => setProcessingScan(false), 500);
     }
@@ -88,11 +169,12 @@ export default function MapDevicesScreen() {
   // -----------------------------
   const handleManualAdd = async () => {
     if (!device_name || !serial_number || !idToken) {
-      Alert.alert('Error', 'Please enter both name and serial number');
+      openAlert('Error', 'Please enter both name and serial number');
       return;
     }
 
     setAddingDevice(true);
+    showLoader();
 
     try {
       await createDevice(idToken, {
@@ -106,9 +188,10 @@ export default function MapDevicesScreen() {
       setSerialNumber('');
       setManualAdd(false);
     } catch (err) {
-      Alert.alert('Error', 'Failed to add device.');
+      openAlert('Error', 'Failed to add device.');
       console.error(err);
     } finally {
+      hideLoader();
       setAddingDevice(false);
     }
   };
@@ -121,14 +204,18 @@ export default function MapDevicesScreen() {
     if (!permission.granted) {
       return (
         <SafeAreaView
-          style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
           edges={['bottom', 'left', 'right']}
         >
           <Text style={{ color: textColor }}>
             We need your permission to access the camera
           </Text>
           <Pressable onPress={requestPermission}>
-            <Text style={{ color: '#2563EB', marginTop: 8 }}>
+            <Text style={{ color: '#9F0EA1', marginTop: 8 }}>
               Grant Permission
             </Text>
           </Pressable>
@@ -161,7 +248,7 @@ export default function MapDevicesScreen() {
   // -----------------------------
   return (
     <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: bgColor }]}
+      style={[styles.safeArea, { backgroundColor: bgColor, padding: 16 }]}
       edges={['bottom', 'left', 'right']}
     >
       <ScrollView
@@ -170,12 +257,17 @@ export default function MapDevicesScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={textColor}
+            tintColor={primaryColor}
           />
         }
       >
         {initial_devices?.map((device) => (
-          <DeviceCard key={device.device_id} device={device} />
+          <DeviceCard
+            key={device.device_id}
+            device={device}
+            unresolvedCount={unresolvedByDevice[device.device_id] ?? 0}
+            nfcCount={nfcByDevice[device.device_id]}
+          />
         ))}
 
         <View style={styles.padding}>
@@ -184,63 +276,60 @@ export default function MapDevicesScreen() {
       </ScrollView>
 
       {/* Manual add modal */}
-      <Modal visible={manualAdd} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: cardColor }]}>
-            <Text style={[styles.title, { color: textColor }]}>Add Device</Text>
-
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: subTextColor }]}>
-                Device Name
-              </Text>
-              <TextInput
-                style={[styles.input, { borderColor, color: textColor }]}
-                placeholder="My ESP32 Alarm 1"
-                placeholderTextColor={subTextColor}
-                value={device_name}
-                onChangeText={setDeviceName}
-              />
-            </View>
-
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: subTextColor }]}>
-                Serial Number
-              </Text>
-              <TextInput
-                style={[styles.input, { borderColor, color: textColor }]}
-                placeholder="ESP32-ABC-001"
-                placeholderTextColor={subTextColor}
-                value={serial_number}
-                onChangeText={setSerialNumber}
-              />
-            </View>
-
-            <Pressable
-              style={[
-                styles.primaryButton,
-                addingDevice && styles.buttonPressed,
-              ]}
-              onPress={handleManualAdd}
-              disabled={addingDevice}
-            >
-              {addingDevice ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.primaryButtonText}>Add Device</Text>
-              )}
-            </Pressable>
-
-            {!addingDevice && (
-              <Pressable
-                style={[{ marginTop: 12 }, styles.secondaryButton]}
-                onPress={() => setManualAdd(false)}
-              >
-                <Text style={styles.secondaryButtonText}>Cancel</Text>
-              </Pressable>
-            )}
+      <ConfirmModal
+        visible={manualAdd}
+        title="Add Device"
+        onCancel={() => setManualAdd(false)}
+        onDismiss={() => setManualAdd(false)}
+        fullWidthActions={true}
+        actions={[
+          {
+            text: 'Cancel',
+            variant: 'cancel',
+            onPress: () => setManualAdd(false),
+          },
+          {
+            text: addingDevice ? 'Adding…' : 'Add Device',
+            variant: 'primary',
+            onPress: () => {
+              if (addingDevice) return;
+              handleManualAdd();
+            },
+          },
+        ]}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
+        >
+          <View style={{ marginTop: 8 }}>
+            <AuthTextField
+              label="Device Name"
+              placeholder="My ESP32 Alarm 1"
+              value={device_name}
+              onChangeText={setDeviceName}
+              autoCapitalize="words"
+            />
+            <AuthTextField
+              label="Serial Number"
+              placeholder="ESP32-ABC-001"
+              value={serial_number}
+              onChangeText={setSerialNumber}
+              autoCapitalize="none"
+            />
           </View>
-        </View>
-      </Modal>
+        </KeyboardAvoidingView>
+      </ConfirmModal>
+
+      <ConfirmModal
+        visible={alert.visible}
+        title={alert.title}
+        actions={alert.actions}
+        onCancel={closeAlert}
+        onDismiss={closeAlert}
+      >
+        {alert.message ? <Text>{alert.message}</Text> : null}
+      </ConfirmModal>
     </SafeAreaView>
   );
 }
@@ -324,7 +413,7 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#9F0EA1',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -341,10 +430,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2563EB',
+    borderColor: '#9F0EA1',
   },
   secondaryButtonText: {
-    color: '#2563EB',
+    color: '#9F0EA1',
     fontSize: 18,
     fontWeight: '600',
   },

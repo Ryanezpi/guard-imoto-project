@@ -1,18 +1,45 @@
 import { ROUTES } from '@/constants/routes';
 import { Stack } from 'expo-router';
-import React from 'react';
-import { Text, Image, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Text, Image, StyleSheet, View } from 'react-native';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import NavButton from '@/components/ui/NavButton';
 import { HeaderEditButton } from '@/components/ui/HeaderEditButton';
+import { useAuth } from '@/context/AuthContext';
+import { getMyAlerts } from '@/services/user.service';
 
 function LayoutContent() {
   const { theme } = useTheme();
+  const { idToken } = useAuth();
+  const [hasAlertBadge, setHasAlertBadge] = useState(false);
 
   // Dynamic colors based on theme
   const headerBg = theme === 'light' ? '#fff' : '#1e1e1e';
   const iconColor = theme === 'light' ? '#000' : '#fff';
   const titleColor = theme === 'light' ? '#000' : '#fff';
+  const badgeColor = '#ef4444';
+
+  const loadAlertBadge = useCallback(async () => {
+    if (!idToken) {
+      setHasAlertBadge(false);
+      return;
+    }
+    try {
+      const res = await getMyAlerts(idToken);
+      const hasUnresolved = Boolean(
+        res?.alerts?.some((alert: any) => !alert?.resolved)
+      );
+      setHasAlertBadge(hasUnresolved);
+    } catch (e) {
+      console.error('[ALERT BADGE]', e);
+    }
+  }, [idToken]);
+
+  useEffect(() => {
+    loadAlertBadge();
+    const interval = setInterval(loadAlertBadge, 30000);
+    return () => clearInterval(interval);
+  }, [loadAlertBadge]);
 
   return (
     <Stack>
@@ -42,11 +69,21 @@ function LayoutContent() {
             />
           ),
           headerRight: () => (
-            <NavButton
-              route={ROUTES.PROFILE.NOTIFICATIONS}
-              iconName="bell"
-              color={iconColor}
-            />
+            <View style={{ position: 'relative' }}>
+              <NavButton
+                route={ROUTES.PROFILE.NOTIFICATIONS}
+                iconName="bell"
+                color={iconColor}
+              />
+              {hasAlertBadge && (
+                <View
+                  style={[
+                    styles.badgeDot,
+                    { backgroundColor: badgeColor },
+                  ]}
+                />
+              )}
+            </View>
           ),
         }}
       />
@@ -182,6 +219,14 @@ const styles = StyleSheet.create({
   logo: {
     width: 64,
     height: 64,
+  },
+  badgeDot: {
+    position: 'absolute',
+    right: 6,
+    top: 0,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
 });
 

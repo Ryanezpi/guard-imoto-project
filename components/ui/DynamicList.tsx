@@ -14,8 +14,10 @@ import DynamicCard from './Card';
 export interface DynamicListItem {
   id: string;
   name: string;
+  nameElement?: React.ReactNode;
   value?: string;
   subText?: string | number | any;
+  subTextElement?: React.ReactNode;
   subTextColor?: string;
   subTextBold?: boolean;
   prefixElement?: React.ReactNode;
@@ -23,6 +25,7 @@ export interface DynamicListItem {
   deviceEnabled?: boolean;
   prefixIcon?: keyof typeof FontAwesome.glyphMap;
   suffixIcon?: keyof typeof FontAwesome.glyphMap;
+  suffixElement?: React.ReactNode;
   expandable?: boolean;
   expanded?: boolean;
   device_id?: string;
@@ -66,6 +69,9 @@ export default function DynamicList({
 }: DynamicListProps) {
   const { theme } = useTheme();
   const textColor = theme === 'light' ? '#000' : '#fff';
+  const primaryColor = theme === 'light' ? '#9F0EA1' : '#C06BD6';
+  const dateHeaderBg = theme === 'light' ? '#e5e7eb' : '#2a2a2a';
+  const dateHeaderText = theme === 'light' ? '#374151' : '#d1d5db';
 
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>(
     () => {
@@ -88,7 +94,7 @@ export default function DynamicList({
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={primaryColor} />
       </View>
     );
   }
@@ -148,14 +154,17 @@ export default function DynamicList({
               <DynamicCard
                 key={cardItem.id}
                 name={cardItem.name}
+                nameElement={cardItem.nameElement}
                 value={cardItem.value}
                 subText={cardItem.subText}
+                subTextElement={cardItem.subTextElement}
                 subTextColor={cardItem.subTextColor}
                 nameTextBold={!cardItem.subTextBold}
                 prefixElement={cardItem.prefixElement}
                 prefixColor={cardItem.prefixColor}
                 prefixIcon={cardItem.prefixIcon}
                 suffixIcon={cardItem.suffixIcon}
+                suffixElement={cardItem.suffixElement}
                 expandable={cardItem.expandable}
                 expanded={
                   cardItem.expandable ? expandedMap[cardItem.id] : undefined
@@ -173,22 +182,29 @@ export default function DynamicList({
       }
       renderItem={({ item: group }) => (
         <View style={styles.group}>
-          <Text style={[styles.dateHeader, { color: textColor }]}>
-            {group.label}
-          </Text>
+          <View
+            style={[styles.dateHeaderWrap, { backgroundColor: dateHeaderBg }]}
+          >
+            <Text style={[styles.dateHeader, { color: dateHeaderText }]}>
+              {group.label}
+            </Text>
+          </View>
 
           {group.data.map((cardItem) => (
             <DynamicCard
               key={cardItem.id}
               name={cardItem.name}
+              nameElement={cardItem.nameElement}
               value={cardItem.value}
               subText={cardItem.subText}
+              subTextElement={cardItem.subTextElement}
               subTextColor={cardItem.subTextColor}
               nameTextBold={!cardItem.subTextBold}
               prefixIcon={cardItem.prefixIcon}
               prefixElement={cardItem.prefixElement}
               prefixColor={cardItem.prefixColor}
               suffixIcon={cardItem.suffixIcon}
+              suffixElement={cardItem.suffixElement}
               expandable={cardItem.expandable}
               expanded={
                 cardItem.expandable ? expandedMap[cardItem.id] : undefined
@@ -214,7 +230,13 @@ const styles = StyleSheet.create({
   dateHeader: {
     fontSize: 14,
     fontWeight: '700',
-    marginBottom: 4,
+  },
+  dateHeaderWrap: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginBottom: 6,
     marginHorizontal: 12,
   },
   center: {

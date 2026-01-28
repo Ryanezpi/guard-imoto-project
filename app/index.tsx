@@ -15,7 +15,7 @@ export default function RootLayout() {
           style={styles.logo}
           resizeMode="contain"
         />
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#9F0EA1" />
       </View>
     );
   }
@@ -23,6 +23,11 @@ export default function RootLayout() {
   // 🔐 Not logged in → auth flow
   if (status === 'unauthenticated') {
     return <Redirect href={ROUTES.AUTH.LOGIN} />;
+  }
+
+  // 📧 Email not verified → verification screen
+  if (status === 'email-unverified') {
+    return <Redirect href={ROUTES.AUTH.CREATE_ACCOUNT.EMAIL_VERIFICATION} />;
   }
 
   // ✅ Logged in → main app

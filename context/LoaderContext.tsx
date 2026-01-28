@@ -26,7 +26,7 @@ export const LoaderProvider = ({ children }: { children: React.ReactNode }) => {
       {visible && (
         <Modal transparent animationType="none" visible>
           <View style={styles.overlay}>
-            <ActivityIndicator size="large" color="#ffffff" />
+            <ActivityIndicator size="large" color="#9F0EA1" />
           </View>
         </Modal>
       )}

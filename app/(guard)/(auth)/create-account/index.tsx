@@ -178,7 +178,7 @@ export default function CreateAccount() {
                   }}
                 />
                 {checkingEmail && (
-                  <ActivityIndicator size="small" color="#2563EB" />
+                  <ActivityIndicator size="small" color="#9F0EA1" />
                 )}
                 {!checkingEmail && emailAvailable === true && (
                   <Text style={{ color: 'green', marginRight: 6 }}>✓</Text>
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#9F0EA1',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -298,10 +298,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2563EB',
+    borderColor: '#9F0EA1',
   },
   secondaryButtonText: {
-    color: '#2563EB',
+    color: '#9F0EA1',
     fontSize: 18,
     fontWeight: '600',
   },

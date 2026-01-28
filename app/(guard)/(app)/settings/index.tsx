@@ -1,12 +1,12 @@
 import DynamicCard from '@/components/ui/Card';
 import TitleSection from '@/components/ui/TitleSection';
-import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ScrollView, View, Text } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ROUTES } from '@/constants/routes';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import * as Clipboard from 'expo-clipboard';
@@ -14,70 +14,100 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import * as Linking from 'expo-linking';
 import { useAuth } from '@/context/AuthContext';
+import { updateProfile } from '@/services/user.service';
+import { useLoader } from '@/context/LoaderContext';
+import ConfirmModal, { type AlertAction } from '@/components/ui/forms/ConfirmModal';
+import SegmentToggle from '@/components/ui/SegmentToggle';
 
 export default function SettingsScreen() {
-  const { theme, toggleTheme } = useTheme();
-  const { logout } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const { logout, idToken, user, refreshUser } = useAuth();
+  const { showLoader, hideLoader } = useLoader();
   const [pushNotificationsEnabled, setPushNotificationsEnabled] =
     useState(false);
-  useEffect(() => {
-    const syncPushPermission = async () => {
-      const { status } = await Notifications.getPermissionsAsync();
-      setPushNotificationsEnabled(status === 'granted');
-    };
+  const [showDisableNotifications, setShowDisableNotifications] =
+    useState(false);
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    title?: string;
+    message?: string;
+    actions: AlertAction[];
+  }>({ visible: false, actions: [] });
 
-    syncPushPermission();
-  }, []);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      Notifications.getPermissionsAsync().then(({ status }) => {
-        setPushNotificationsEnabled(status === 'granted');
-      });
-    }, [])
+  const closeAlert = useCallback(
+    () => setAlert((prev) => ({ ...prev, visible: false })),
+    []
   );
+  const openAlert = useCallback(
+    (title: string, message: string, actions?: AlertAction[]) =>
+      setAlert({
+        visible: true,
+        title,
+        message,
+        actions:
+          actions ??
+          [{ text: 'OK', variant: 'primary', onPress: closeAlert }],
+      }),
+    [closeAlert]
+  );
+
+  useEffect(() => {
+    if (!user) return;
+    setPushNotificationsEnabled(Boolean(user.notifications_enabled));
+  }, [user]);
 
   const bgColor = theme === 'light' ? '#f0f0f0' : '#272727ff';
   const resetApp = async () => {
     try {
+      showLoader();
       await AsyncStorage.clear();
       await signOut(auth);
       console.log('App storage and Auth cleared!');
       router.replace(ROUTES.AUTH.LOGIN);
     } catch (e) {
       console.error('Failed to reset app', e);
+    } finally {
+      hideLoader();
     }
   };
   // --- Copy ID Token (User Auth) ---
   const copyIdToken = async () => {
     try {
+      showLoader();
       const user = auth.currentUser;
       if (user) {
         const idToken = await user.getIdToken(true);
         await Clipboard.setStringAsync(idToken);
-        Alert.alert(
+        openAlert(
           'Auth Token Copied',
           'Paste this into Postman Authorization header.'
         );
       } else {
-        Alert.alert('Error', 'No user logged in.');
+        openAlert('Error', 'No user logged in.');
       }
     } catch (err) {
       console.log(err);
-      Alert.alert('Error', 'Failed to get ID token.');
+      openAlert('Error', 'Failed to get ID token.');
+    } finally {
+      hideLoader();
     }
   };
 
   const handlePushToggle = async (nextValue: boolean) => {
+    if (!idToken) {
+      openAlert('Error', 'No user token found. Please log in again.');
+      return;
+    }
+
     // Turning OFF is always allowed
     if (!nextValue) {
-      setPushNotificationsEnabled(false);
+      setShowDisableNotifications(true);
       return;
     }
 
     // Physical device required
     if (!Device.isDevice) {
-      Alert.alert(
+      openAlert(
         'Unsupported Device',
         'Push notifications require a physical device.'
       );
@@ -98,25 +128,52 @@ export default function SettingsScreen() {
 
     // Still denied → force user to settings
     if (finalStatus !== 'granted') {
-      Alert.alert(
-        'Notifications Disabled',
-        'Please enable notifications in system settings to receive alerts.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Open Settings',
-            onPress: () => Linking.openSettings(),
+      openAlert('Notifications Disabled', 'Please enable notifications in system settings to receive alerts.', [
+        { text: 'Cancel', variant: 'cancel', onPress: closeAlert },
+        {
+          text: 'Open Settings',
+          variant: 'primary',
+          onPress: () => {
+            closeAlert();
+            Linking.openSettings();
           },
-        ]
-      );
+        },
+      ]);
 
       // Ensure toggle stays OFF
       setPushNotificationsEnabled(false);
       return;
     }
 
-    // ✅ Permission granted
-    setPushNotificationsEnabled(true);
+    // ✅ Permission granted → enable in backend
+    showLoader();
+    try {
+      await updateProfile(idToken, { notifications_enabled: true });
+      setPushNotificationsEnabled(true);
+      await refreshUser();
+    } catch (err) {
+      console.log('[Push] Failed to enable notifications:', err);
+      openAlert('Error', 'Failed to update notification preference.');
+      setPushNotificationsEnabled(false);
+    } finally {
+      hideLoader();
+    }
+  };
+
+  const confirmDisableNotifications = async () => {
+    if (!idToken) return;
+    setShowDisableNotifications(false);
+    showLoader();
+    try {
+      await updateProfile(idToken, { notifications_enabled: false });
+      setPushNotificationsEnabled(false);
+      await refreshUser();
+    } catch (err) {
+      console.log('[Push] Failed to disable notifications:', err);
+      openAlert('Error', 'Failed to update notification preference.');
+    } finally {
+      hideLoader();
+    }
   };
 
   return (
@@ -149,13 +206,13 @@ export default function SettingsScreen() {
         </TitleSection>
 
         <TitleSection title="Theme">
-          <DynamicCard
-            name={theme === 'light' ? 'Light Mode' : 'Dark Mode'}
-            prefixIcon={theme === 'light' ? 'sun-o' : 'moon-o'}
-            suffixIcon="chevron-right"
-            toggle
-            toggleValue={theme === 'light'}
-            onToggle={toggleTheme}
+          <SegmentToggle
+            value={theme}
+            onChange={(next) => setTheme(next)}
+            options={[
+              { label: 'Light', value: 'light' },
+              { label: 'Dark', value: 'dark' },
+            ]}
           />
         </TitleSection>
 
@@ -190,6 +247,7 @@ export default function SettingsScreen() {
             prefixIcon="sign-out"
             prefixColor="#ff4d4f"
             onPress={async () => {
+              showLoader();
               try {
                 await signOut(auth);
                 await logout();
@@ -197,11 +255,39 @@ export default function SettingsScreen() {
                 router.replace(ROUTES.AUTH.LOGIN);
               } catch (err) {
                 console.error('Logout failed', err);
+              } finally {
+                hideLoader();
               }
             }}
           />
         </View>
       </ScrollView>
+
+      <ConfirmModal
+        visible={showDisableNotifications}
+        title="Disable Notifications?"
+        confirmText="Turn Off"
+        cancelText="Cancel"
+        onCancel={() => setShowDisableNotifications(false)}
+        onConfirm={confirmDisableNotifications}
+      >
+        <View>
+          <Text style={{ marginBottom: 8 }}>
+            Turning this off will bypass device alerts. You can still see alert
+            logs, but you will not receive push notifications.
+          </Text>
+        </View>
+      </ConfirmModal>
+
+      <ConfirmModal
+        visible={alert.visible}
+        title={alert.title}
+        actions={alert.actions}
+        onCancel={closeAlert}
+        onDismiss={closeAlert}
+      >
+        {alert.message ? <Text>{alert.message}</Text> : null}
+      </ConfirmModal>
     </SafeAreaView>
   );
 }

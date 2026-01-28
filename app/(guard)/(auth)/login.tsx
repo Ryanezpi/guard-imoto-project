@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   toggle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2563EB',
+    color: '#9F0EA1',
     paddingLeft: 12,
   },
 
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     height: 52,
     borderRadius: 14,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#9F0EA1',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   link: {
     marginTop: 16,
     fontSize: 14,
-    color: '#2563EB',
+    color: '#9F0EA1',
     textAlign: 'center',
   },
 

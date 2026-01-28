@@ -20,6 +20,7 @@ export default function SegmentToggle<T extends string>({
 }: SegmentToggleProps<T>) {
   const { theme } = useTheme();
   const isLight = theme === 'light';
+  const bgColor = isLight ? '#9F0EA1' : '#B874DB';
 
   return (
     <View
@@ -41,7 +42,7 @@ export default function SegmentToggle<T extends string>({
               flex: 1,
               paddingVertical: 12,
               borderRadius: 10,
-              backgroundColor: active ? '#4e8cff' : 'transparent',
+              backgroundColor: active ? bgColor : 'transparent',
               alignItems: 'center',
             }}
           >

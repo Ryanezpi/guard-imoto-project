@@ -1,8 +1,8 @@
 export const DEVICE_COLORS = [
-  // Blues & Teals
-  '#4e8cff', // blue
-  '#3b82f6', // sky blue
-  '#2563eb', // deep blue
+  // Purples & Teals
+  '#D3A6E7', // lavender
+  'rgb(192, 107, 214)', // violet
+  '#9F0EA1', // deep purple
   '#00bcd4', // cyan
   '#14b8a6', // teal
   '#0d9488', // deep teal

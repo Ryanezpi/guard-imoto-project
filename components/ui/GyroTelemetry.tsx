@@ -2,12 +2,13 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
   ActivityIndicator,
   StyleSheet,
+  ScrollView,
 } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { getGyroTelemetry } from '@/services/user.service';
+import DateTimePill from '@/components/ui/DateTimePill';
 
 interface GyroTelemetryProps {
   deviceId: string;
@@ -38,7 +39,7 @@ export function GyroTelemetry({
     text: theme === 'light' ? '#111' : '#f5f5f5',
     muted: theme === 'light' ? '#999' : '#aaa',
     border: theme === 'light' ? '#eee' : '#333',
-    magnitude: theme === 'light' ? '#4e8cff' : '#61a0ff',
+    magnitude: theme === 'light' ? '#B874DB' : '#D090E8',
   };
 
   const fetchData = useCallback(async () => {
@@ -85,11 +86,11 @@ export function GyroTelemetry({
   /* ─────────── Data ─────────── */
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      <FlatList
-        data={data}
-        keyExtractor={(i) => i.id}
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => {
+        contentContainerStyle={styles.listContent}
+      >
+        {data.map((item) => {
           const magnitude = Math.sqrt(
             item.x ** 2 + item.y ** 2 + item.z ** 2
           ).toFixed(2);
@@ -97,30 +98,72 @@ export function GyroTelemetry({
 
           return (
             <View
+              key={item.id}
               style={[
                 styles.card,
                 { backgroundColor: colors.cardBg, borderColor: colors.border },
               ]}
             >
-              {/* Magnitude */}
-              <Text style={[styles.magnitude, { color: colors.magnitude }]}>
-                Magnitude: {magnitude}
-              </Text>
+              <View style={styles.cardHeader}>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>
+                  Gyroscope
+                </Text>
+              </View>
 
-              {/* Axis values */}
-              <Text style={[styles.axes, { color: colors.muted }]}>
-                x: {item.x} • y: {item.y} • z: {item.z}
-              </Text>
+              <View
+                style={[
+                  styles.metaCard,
+                  { backgroundColor: colors.bg, borderColor: colors.border },
+                ]}
+              >
+                <View style={styles.metaColumn}>
+                  <View style={styles.metaItemRow}>
+                    <Text style={[styles.metaLabel, { color: colors.muted }]}>
+                      X Axis
+                    </Text>
+                    <Text style={[styles.metaValue, { color: colors.text }]}>
+                      {item.x}
+                    </Text>
+                  </View>
+                  <View style={styles.metaItemRow}>
+                    <Text style={[styles.metaLabel, { color: colors.muted }]}>
+                      Y Axis
+                    </Text>
+                    <Text style={[styles.metaValue, { color: colors.text }]}>
+                      {item.y}
+                    </Text>
+                  </View>
+                  <View style={styles.metaItemRow}>
+                    <Text style={[styles.metaLabel, { color: colors.muted }]}>
+                      Z Axis
+                    </Text>
+                    <Text style={[styles.metaValue, { color: colors.text }]}>
+                      {item.z}
+                    </Text>
+                  </View>
+                </View>
+              </View>
 
               {/* Timestamp */}
-              <Text style={[styles.timestamp, { color: colors.muted }]}>
-                {recordedAt.toLocaleDateString()} •{' '}
-                {recordedAt.toLocaleTimeString()}
-              </Text>
+              <View style={styles.pillsRow}>
+                <View
+                  style={[
+                    styles.magnitudeBadge,
+                    { backgroundColor: `${colors.magnitude}22` },
+                  ]}
+                >
+                  <Text
+                    style={[styles.magnitudeText, { color: colors.magnitude }]}
+                  >
+                    Magnitude {magnitude}
+                  </Text>
+                </View>
+                <DateTimePill value={recordedAt} />
+              </View>
             </View>
           );
-        }}
-      />
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -135,22 +178,64 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  listContent: {
+    paddingBottom: 24,
+  },
   card: {
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
     marginBottom: 10,
   },
-  magnitude: {
-    fontSize: 16,
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  headerTitle: {
+    fontSize: 13,
     fontWeight: '700',
   },
-  axes: {
-    fontSize: 13,
-    marginTop: 4,
+  magnitudeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
   },
-  timestamp: {
+  magnitudeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  metaCard: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 6,
+  },
+  pillsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  metaColumn: {
+    flexDirection: 'column',
+    gap: 6,
+  },
+  metaItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  metaLabel: {
     fontSize: 12,
-    marginTop: 2,
+    fontWeight: '600',
+  },
+  metaValue: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

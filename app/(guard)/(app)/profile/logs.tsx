@@ -6,6 +6,8 @@ import { useRouter } from 'expo-router';
 import DevicePrefix from '@/components/ui/DevicePrefix';
 import { AuditLog, getMyAuditLogs } from '@/services/user.service';
 import { useAuth } from '@/context/AuthContext';
+import DateTimePill from '@/components/ui/DateTimePill';
+import { Text, View } from 'react-native';
 
 const actionLabelMap: Record<string, string> = {
   updated_profile: 'Updated profile',
@@ -44,6 +46,7 @@ export default function AuditLogsScreen() {
   const router = useRouter();
 
   const bgColor = theme === 'light' ? '#f0f0f0' : '#272727';
+  const subTextColor = theme === 'light' ? '#6b7280' : '#9ca3af';
 
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,10 +75,17 @@ export default function AuditLogsScreen() {
   const auditItems: DynamicListItem[] = logs.map((log) => ({
     id: log.id,
     name: formatAction(log.action),
-    subText: summarizeMetadata(log.metadata),
+    subTextElement: (
+      <View style={{ gap: 6, marginTop: 2 }}>
+        <Text style={{ color: subTextColor, fontSize: 13 }}>
+          {summarizeMetadata(log.metadata)}
+        </Text>
+        <DateTimePill value={log.created_at} />
+      </View>
+    ),
     prefixElement: (
       <DevicePrefix
-        color={log.action === 'updated_profile' ? '#4e8cff' : '#16a34a'}
+        color={log.action === 'updated_profile' ? '#B874DB' : '#16a34a'}
       />
     ),
     suffixIcon: 'chevron-right',

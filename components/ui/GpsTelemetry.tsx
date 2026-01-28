@@ -2,15 +2,16 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
   ActivityIndicator,
   StyleSheet,
   Pressable,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import MapView, { Marker, Polyline, LatLng, Region } from 'react-native-maps';
 import { useTheme } from '@/context/ThemeContext';
 import { getGPSTelemetry } from '@/services/user.service';
+import DateTimePill from '@/components/ui/DateTimePill';
 
 interface GpsTelemetryProps {
   deviceId: string;
@@ -40,9 +41,9 @@ export function GpsTelemetry({ deviceId, idToken }: GpsTelemetryProps) {
     text: theme === 'light' ? '#111' : '#f5f5f5',
     muted: theme === 'light' ? '#999' : '#aaa',
     border: theme === 'light' ? '#eee' : '#333',
-    accuracy: theme === 'light' ? '#4e8cff' : '#61a0ff',
-    polyline: theme === 'light' ? '#2563eb' : '#61a0ff',
-    primary: '#61a0ff',
+    accuracy: theme === 'light' ? '#B874DB' : '#D090E8',
+    polyline: theme === 'light' ? '#9F0EA1' : '#C06BD6',
+    primary: '#D090E8',
   };
 
   // Fetch ONCE
@@ -148,14 +149,14 @@ export function GpsTelemetry({ deviceId, idToken }: GpsTelemetryProps) {
       </Text>
 
       {/* LIST - Set a max height relative to screen to prevent modal overflow */}
-      <View style={{ maxHeight: SCREEN_HEIGHT * 0.4 }}>
-        <FlatList
-          data={data}
-          keyExtractor={(i) => i.id}
+      <View style={{ maxHeight: SCREEN_HEIGHT * 0.45, flexGrow: 1 }}>
+        <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
+        >
+          {data.map((item) => (
             <Pressable
+              key={item.id}
               style={[
                 styles.card,
                 { backgroundColor: colors.cardBg, borderColor: colors.border },
@@ -163,19 +164,53 @@ export function GpsTelemetry({ deviceId, idToken }: GpsTelemetryProps) {
               onPress={() => focusOnPoint(Number(item.lat), Number(item.lng))}
             >
               <View style={styles.cardHeader}>
-                <Text style={[styles.coordText, { color: colors.text }]}>
-                  {Number(item.lat).toFixed(5)}, {Number(item.lng).toFixed(5)}
-                </Text>
-                <Text style={[styles.accuracyText, { color: colors.primary }]}>
-                  ±{item.accuracy}m
+                <Text style={[styles.headerTitle, { color: colors.text }]}>
+                  Coordinates
                 </Text>
               </View>
-              <Text style={[styles.dateText, { color: colors.muted }]}>
-                {new Date(item.recorded_at).toLocaleString()}
-              </Text>
+              <View
+                style={[
+                  styles.metaCard,
+                  { backgroundColor: colors.bg, borderColor: colors.border },
+                ]}
+              >
+                <View style={styles.metaColumn}>
+                  <View style={styles.metaItemRow}>
+                    <Text style={[styles.metaLabel, { color: colors.muted }]}>
+                      Latitude
+                    </Text>
+                    <Text style={[styles.metaValue, { color: colors.text }]}>
+                      {item.lat}
+                    </Text>
+                  </View>
+                  <View style={styles.metaItemRow}>
+                    <Text style={[styles.metaLabel, { color: colors.muted }]}>
+                      Longitude
+                    </Text>
+                    <Text style={[styles.metaValue, { color: colors.text }]}>
+                      {item.lng}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.pillsRow}>
+                <View
+                  style={[
+                    styles.accuracyBadge,
+                    { backgroundColor: `${colors.primary}22` },
+                  ]}
+                >
+                  <Text
+                    style={[styles.accuracyText, { color: colors.primary }]}
+                  >
+                    Drift ±{item.accuracy}m
+                  </Text>
+                </View>
+                <DateTimePill value={item.recorded_at} />
+              </View>
             </Pressable>
-          )}
-        />
+          ))}
+        </ScrollView>
       </View>
     </View>
   );
@@ -214,7 +249,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   listContent: {
-    paddingBottom: 10,
+    paddingBottom: 28,
   },
   card: {
     padding: 12,
@@ -224,20 +259,54 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     marginBottom: 4,
   },
-  coordText: {
-    fontWeight: '600',
-    fontSize: 14,
+  headerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  accuracyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
   },
   accuracyText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 11,
+    fontWeight: '700',
   },
-  dateText: {
+  metaCard: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  metaColumn: {
+    flexDirection: 'column',
+    gap: 6,
+  },
+  metaItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  pillsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  metaLabel: {
     fontSize: 12,
+    fontWeight: '600',
+  },
+  metaValue: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   centerBox: {
     alignItems: 'center',
