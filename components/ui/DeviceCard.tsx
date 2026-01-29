@@ -139,36 +139,36 @@ export const DeviceCard = ({
             >
               ({device.serial_number || '—'})
             </Text>
-            {showEditButton && onEditPress && (
-              <Pressable
-                style={[styles.editIconBtn, { borderColor: editColor }]}
-                onPress={onEditPress}
+            <View
+              style={[
+                styles.deviceStatusPill,
+                {
+                  backgroundColor: isOffline
+                    ? statusPillBg
+                    : `${statusOnlineColor}22`,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.deviceStatusText,
+                  { color: isOffline ? statusPillText : statusOnlineColor },
+                ]}
               >
-                <FontAwesome name="pencil" size={12} color={editColor} />
-              </Pressable>
-            )}
+                {isOffline ? 'Disabled' : 'Enabled'}
+              </Text>
+            </View>
           </View>
         </View>
         <View style={styles.devicePillsRow}>
-          <View
-            style={[
-              styles.deviceStatusPill,
-              {
-                backgroundColor: isOffline
-                  ? statusPillBg
-                  : `${statusOnlineColor}22`,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.deviceStatusText,
-                { color: isOffline ? statusPillText : statusOnlineColor },
-              ]}
+          {showEditButton && onEditPress && (
+            <Pressable
+              style={[styles.editIconBtn, { borderColor: editColor }]}
+              onPress={onEditPress}
             >
-              {isOffline ? 'Disabled' : 'Enabled'}
-            </Text>
-          </View>
+              <FontAwesome name="pencil" size={12} color={editColor} />
+            </Pressable>
+          )}
           {typeof unresolvedCount === 'number' && unresolvedCount > 0 && (
             <View
               style={[styles.unresolvedPill, { backgroundColor: unresolvedBg }]}

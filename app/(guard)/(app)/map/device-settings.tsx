@@ -26,7 +26,7 @@ import {
   unlinkDevice,
 } from '@/services/user.service';
 import { router, useGlobalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   ScrollView,
   TextInput,
@@ -208,7 +208,6 @@ export default function DeviceSettingsScreen() {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [vehicleLoading, setVehicleLoading] = useState(false);
   const [vehicleModalVisible, setVehicleModalVisible] = useState(false);
-  const [vehicleTypeModalVisible, setVehicleTypeModalVisible] = useState(false);
   const [vehicleDraft, setVehicleDraft] = useState<UpsertVehicleBody>({
     type: 'motorbike',
   });
@@ -590,6 +589,40 @@ export default function DeviceSettingsScreen() {
     </View>
   );
 
+  const vehicleTypeLabel = (t?: VehicleType | null) => {
+    const v = String(t ?? 'motorbike');
+    const spaced = v.replace(/_/g, ' ');
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+  };
+
+  const renderInfoPill = (
+    icon: keyof typeof FontAwesome.glyphMap,
+    text: string
+  ) => (
+    <View
+      style={{
+        alignSelf: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: theme === 'light' ? '#e5e7eb' : '#333',
+        backgroundColor: datePillBg,
+      }}
+    >
+      <FontAwesome name={icon} size={12} color={iconMuted} />
+      <Text
+        style={{ color: datePillText, fontSize: 12, fontWeight: '700' }}
+        numberOfLines={1}
+      >
+        {text}
+      </Text>
+    </View>
+  );
+
   const openVehicleModal = () => {
     const current = vehicle;
     setVehicleDraft({
@@ -638,12 +671,6 @@ export default function DeviceSettingsScreen() {
     }
 
     return cleaned;
-  };
-
-  const vehicleTypeLabel = (t?: VehicleType | null) => {
-    const v = (t ?? 'motorbike') as string;
-    const spaced = v.replace(/_/g, ' ');
-    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
   };
   return (
     <SafeAreaView
@@ -887,37 +914,6 @@ export default function DeviceSettingsScreen() {
             text="Optional: Add vehicle details to personalize your device. This is not required for tracking."
           />
 
-          <View style={{ marginBottom: 18 }}>
-            <Text style={{ color: iconMuted, fontSize: 13, fontWeight: '600' }}>
-              Type
-            </Text>
-            <Pressable
-              onPress={() => setVehicleTypeModalVisible(true)}
-              style={{
-                marginTop: 8,
-                height: 48,
-                borderRadius: 10,
-                borderWidth: 1,
-                borderColor: theme === 'light' ? '#d1d5db' : '#3f3f46',
-                paddingHorizontal: 14,
-                backgroundColor: theme === 'light' ? '#ffffff' : '#272727',
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Text
-                style={{ color: textColor, fontSize: 16, fontWeight: '600' }}
-              >
-                {vehicleTypeLabel(vehicleDraft.type as VehicleType)}
-              </Text>
-              <FontAwesome
-                name="chevron-down"
-                size={12}
-                color={theme === 'light' ? '#6b7280' : '#9ca3af'}
-              />
-            </Pressable>
-          </View>
           <AuthTextField
             label="Nickname"
             placeholder="My Bike"
@@ -990,35 +986,6 @@ export default function DeviceSettingsScreen() {
             autoCapitalize="characters"
           />
         </View>
-      </ConfirmModal>
-
-      <ConfirmModal
-        visible={vehicleTypeModalVisible}
-        title="Select Vehicle Type"
-        onCancel={() => setVehicleTypeModalVisible(false)}
-        onDismiss={() => setVehicleTypeModalVisible(false)}
-        fullWidthActions={true}
-        actions={[
-          ...VEHICLE_TYPES.map((t) => ({
-            text: vehicleTypeLabel(t),
-            variant: (t === vehicleDraft.type
-              ? 'primary'
-              : 'default') as AlertAction['variant'],
-            onPress: () => {
-              setVehicleDraft((prev) => ({ ...prev, type: t }));
-              setVehicleTypeModalVisible(false);
-            },
-          })),
-          {
-            text: 'Cancel',
-            variant: 'cancel' as AlertAction['variant'],
-            onPress: () => setVehicleTypeModalVisible(false),
-          },
-        ]}
-      >
-        <Text style={{ color: iconMuted, marginTop: 6, lineHeight: 18 }}>
-          Type is stored in lowercase for the API but displayed in sentence case.
-        </Text>
       </ConfirmModal>
 
       <ConfirmModal
@@ -1120,56 +1087,164 @@ export default function DeviceSettingsScreen() {
                 padding: 14,
               }}
             >
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 10,
-                }}
-              >
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text
-                    style={{
-                      color: textColor,
-                      fontWeight: '800',
-                      fontSize: 15,
-                    }}
-                    numberOfLines={1}
-                  >
-                    {vehicle.nickname ||
-                      [vehicle.make, vehicle.model].filter(Boolean).join(' ') ||
-                      'Vehicle'}
-                  </Text>
-                  <Text
-                    style={{
-                      color: iconMuted,
-                      fontSize: 12,
-                      fontWeight: '600',
-                      marginTop: 2,
-                    }}
-                    numberOfLines={1}
-                  >
-                    {vehicle.type}
-                    {vehicle.year ? ` • ${vehicle.year}` : ''}
-                    {vehicle.license_plate ? ` • ${vehicle.license_plate}` : ''}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={openVehicleModal}
-                  style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    borderRadius: 10,
-                    borderWidth: 1,
-                    borderColor: primaryColor,
-                  }}
-                >
-                  <Text style={{ color: primaryColor, fontWeight: '800' }}>
-                    Edit
-                  </Text>
-                </Pressable>
-              </View>
+              {(() => {
+                const t = vehicle.type as VehicleType | undefined;
+                const icon: keyof typeof FontAwesome.glyphMap =
+                  t === 'truck'
+                    ? 'truck'
+                    : t === 'van'
+                      ? 'truck'
+                      : t === 'car'
+                        ? 'car'
+                        : t === 'bike'
+                          ? 'bicycle'
+                          : t === 'scooter'
+                            ? 'motorcycle'
+                            : t === 'motorcycle'
+                              ? 'motorcycle'
+                              : 'motorcycle';
+
+                const pills: ReactNode[] = [];
+                if (vehicle.make) {
+                  pills.push(
+                    <View key="make">
+                      {renderInfoPill('industry', `Make: ${vehicle.make}`)}
+                    </View>
+                  );
+                }
+                if (vehicle.model) {
+                  pills.push(
+                    <View key="model">
+                      {renderInfoPill('tag', `Model: ${vehicle.model}`)}
+                    </View>
+                  );
+                }
+                if (vehicle.year) {
+                  pills.push(
+                    <View key="year">
+                      {renderInfoPill('calendar', `Year: ${vehicle.year}`)}
+                    </View>
+                  );
+                }
+                if (vehicle.color) {
+                  pills.push(
+                    <View key="color">
+                      {renderInfoPill('tint', `Color: ${vehicle.color}`)}
+                    </View>
+                  );
+                }
+                if (vehicle.license_plate) {
+                  pills.push(
+                    <View key="plate">
+                      {renderInfoPill(
+                        'id-card',
+                        `Plate: ${String(vehicle.license_plate).toUpperCase()}`
+                      )}
+                    </View>
+                  );
+                }
+                if (vehicle.vin) {
+                  pills.push(
+                    <View key="vin">
+                      {renderInfoPill('barcode', `VIN: ${vehicle.vin}`)}
+                    </View>
+                  );
+                }
+
+                return (
+                  <>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', gap: 10, flex: 1 }}>
+                        <View
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 18,
+                            backgroundColor: `${primaryColor}22`,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <FontAwesome
+                            name={icon}
+                            size={16}
+                            color={primaryColor}
+                          />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text
+                            style={{
+                              color: textColor,
+                              fontWeight: '800',
+                              fontSize: 15,
+                            }}
+                            numberOfLines={1}
+                          >
+                            {vehicle.nickname ||
+                              [vehicle.make, vehicle.model]
+                                .filter(Boolean)
+                                .join(' ') ||
+                              'Vehicle'}
+                          </Text>
+                          <Text
+                            style={{
+                              color: iconMuted,
+                              fontSize: 12,
+                              fontWeight: '600',
+                              marginTop: 2,
+                            }}
+                            numberOfLines={1}
+                          >
+                            {[
+                              vehicle.year ? `${vehicle.year}` : null,
+                              vehicle.license_plate
+                                ? String(vehicle.license_plate).toUpperCase()
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' • ')}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Pressable
+                        onPress={openVehicleModal}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 14,
+                          borderWidth: 1,
+                          borderColor: primaryColor,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <FontAwesome name="pencil" size={12} color={primaryColor} />
+                      </Pressable>
+                    </View>
+
+                    {pills.length ? (
+                      <View
+                        style={{
+                          marginTop: 12,
+                          flexDirection: 'row',
+                          flexWrap: 'wrap',
+                          gap: 8,
+                        }}
+                      >
+                        {pills}
+                      </View>
+                    ) : null}
+                  </>
+                );
+              })()}
             </View>
           ) : (
             <View style={{ gap: 10 }}>
