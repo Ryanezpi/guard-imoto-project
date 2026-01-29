@@ -589,12 +589,6 @@ export default function DeviceSettingsScreen() {
     </View>
   );
 
-  const vehicleTypeLabel = (t?: VehicleType | null) => {
-    const v = String(t ?? 'motorbike');
-    const spaced = v.replace(/_/g, ' ');
-    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-  };
-
   const renderInfoPill = (
     icon: keyof typeof FontAwesome.glyphMap,
     text: string
@@ -1226,7 +1220,11 @@ export default function DeviceSettingsScreen() {
                           justifyContent: 'center',
                         }}
                       >
-                        <FontAwesome name="pencil" size={12} color={primaryColor} />
+                        <FontAwesome
+                          name="pencil"
+                          size={12}
+                          color={primaryColor}
+                        />
                       </Pressable>
                     </View>
 
