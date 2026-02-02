@@ -70,6 +70,7 @@ export default function AuthTextField({
   const placeholderColor = theme === 'light' ? '#9ca3af' : '#6b7280';
   const borderColor = theme === 'light' ? '#b0b7c3' : '#2b2f35';
   const focusBorderColor = theme === 'light' ? '#9F0EA1' : '#C06BD6';
+  const selectionColor = theme === 'light' ? '#C06BD6' : '#D090E8';
   const errorColor = theme === 'light' ? '#dc2626' : '#f87171';
   const helpTextColor = error ? errorColor : theme === 'light' ? '#6b7280' : '#9ca3af';
 
@@ -116,6 +117,7 @@ export default function AuthTextField({
           textContentType={textContentType}
           autoCorrect={autoCorrect}
           blurOnSubmit={blurOnSubmit}
+          selectionColor={selectionColor}
           onFocus={(e) => {
             setIsFocused(true);
             onFocus?.(e);

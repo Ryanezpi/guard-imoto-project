@@ -72,28 +72,22 @@ export default function SettingsScreen() {
       hideLoader();
     }
   };
-  // --- Copy ID Token (User Auth) ---
-  const copyIdToken = async () => {
+  // --- Log ID Token (User Auth) ---
+  const copyIdToken = useCallback(async () => {
     try {
-      showLoader();
       const user = auth.currentUser;
       if (user) {
         const idToken = await getIdToken(user, true);
-        await Clipboard.setStringAsync(idToken);
-        openAlert(
-          'Auth Token Copied',
-          'Paste this into Postman Authorization header.'
-        );
-      } else {
-        openAlert('Error', 'No user logged in.');
+        console.log('[Auth] ID token:', idToken);
       }
     } catch (err) {
       console.log(err);
-      openAlert('Error', 'Failed to get ID token.');
-    } finally {
-      hideLoader();
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    copyIdToken();
+  }, [copyIdToken]);
 
   const handlePushToggle = async (nextValue: boolean) => {
     if (!idToken) {
@@ -260,10 +254,8 @@ export default function SettingsScreen() {
             onPress={async () => {
               showLoader();
               try {
-                await signOut(auth);
                 await logout();
                 await AsyncStorage.multiRemove(['theme', 'onboardingSeen']);
-                router.replace(ROUTES.AUTH.LOGIN);
               } catch (err) {
                 console.log('Logout failed', err);
               } finally {

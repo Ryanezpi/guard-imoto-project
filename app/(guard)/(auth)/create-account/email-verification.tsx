@@ -121,7 +121,7 @@ export default function EmailVerification() {
       if (currentUser.emailVerified) {
         console.log('Email verified!');
         await refreshUser();
-        router.replace(ROUTES.APP.MAP);
+        // Navigation handled by auth guard after status updates.
       } else {
         setErrorMessage('Email not verified yet. Please check your inbox.');
       }

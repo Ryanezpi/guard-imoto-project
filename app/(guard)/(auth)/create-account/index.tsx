@@ -10,10 +10,12 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableWithoutFeedback,
   View,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -39,6 +41,7 @@ export default function CreateAccount() {
   });
 
   const { draft, setDraft, resetDraft } = useCreateAccountDraft();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // Validation rules
   useEffect(() => {
@@ -54,6 +57,10 @@ export default function CreateAccount() {
 
     setIsValid(valid);
   }, [draft]);
+
+  useEffect(() => {
+    resetDraft();
+  }, [resetDraft]);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const phoneRegex = /^09\d{9}$/;
@@ -99,13 +106,35 @@ export default function CreateAccount() {
     }
   }
 
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
       <KeyboardAvoidingView
-        style={[styles.card, { backgroundColor: cardColor }]}
+        style={styles.safeArea}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View>
+          <ScrollView
+            contentContainerStyle={[
+              styles.card,
+              { backgroundColor: cardColor, paddingBottom: 24 + keyboardHeight },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             <Text style={[styles.title, { color: textColor }]}>
               Create account
             </Text>
@@ -218,7 +247,7 @@ export default function CreateAccount() {
             >
               <Text style={styles.secondaryButtonText}>Cancel</Text>
             </Pressable>
-          </View>
+          </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -231,8 +260,8 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    flex: 1,
     paddingTop: 32,
+    paddingBottom: 24,
     marginHorizontal: 20,
     borderRadius: 20,
   },

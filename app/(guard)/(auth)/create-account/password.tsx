@@ -10,13 +10,47 @@ import { useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword } from '@react-native-firebase/auth';
 import PrivacyPolicyModal from '@/components/ui/PrivacyPolicyModal';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
+
+const waitForBackendReady = async () => {
+  if (!API_BASE) return;
+  let delay = 2000;
+  // Keep waiting until backend is ready (cold start safe)
+  while (true) {
+    try {
+      const res = await fetch(`${API_BASE}/health`);
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        const status = (data?.status ?? data?.ok ?? '')
+          .toString()
+          .toLowerCase();
+        if (status === 'ok' || res.status === 200) return;
+      }
+    } catch {
+      // ignore and retry
+    }
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    delay = Math.min(delay * 2, 300000);
+  }
+};
 
 export default function PasswordStep() {
   const router = useRouter();
   const { theme } = useTheme();
-  const { showLoader, hideLoader } = useLoader();
+  const { showLoader } = useLoader();
   const bgColor = theme === 'light' ? '#ffffff' : '#272727';
   const cardColor = theme === 'light' ? '#ffffff' : '#1f1f1f';
   const textColor = theme === 'light' ? '#111827' : '#f9fafb';
@@ -29,6 +63,7 @@ export default function PasswordStep() {
   const [loading, setLoading] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [attempted, setAttempted] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [touched, setTouched] = useState({
     password: false,
     confirm: false,
@@ -62,6 +97,19 @@ export default function PasswordStep() {
       ? 'You must agree to the privacy policy.'
       : undefined;
 
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   const next = async () => {
     if (!isValid || loading) return;
 
@@ -74,136 +122,159 @@ export default function PasswordStep() {
         draft.password
       );
 
+      await waitForBackendReady();
       await registerUserWithBackend(res.user, {
         first_name: draft.firstName,
         last_name: draft.lastName,
         phone: draft.phone,
       });
-      hideLoader();
       router.replace(ROUTES.AUTH.CREATE_ACCOUNT.EMAIL_VERIFICATION);
     } catch (e: any) {
       alert(e.message);
     } finally {
       setLoading(false);
-      hideLoader();
     }
   };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
-      <View style={[styles.card, { backgroundColor: cardColor }]}>
-        <Text style={[styles.title, { color: textColor }]}>Set a password</Text>
-        <Text style={[styles.subtitle, { color: subTextColor }]}>
-          Your password must be at least 6 characters
-        </Text>
-
-        {/* Password */}
-        <AuthTextField
-          label={<Text style={[styles.label, { color: subTextColor }]}>Password</Text>}
-          secureTextEntry={secure1}
-          placeholder="••••••••"
-          value={draft.password}
-          onChangeText={(v) => setDraft({ password: v })}
-          onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
-          error={passwordError}
-          rightElement={
-            <Pressable onPress={() => setSecure1(!secure1)}>
-              <Text style={styles.toggle}>
-                {secure1 ? (
-                  <FontAwesome name="eye" size={18} color="#8E8E93" />
-                ) : (
-                  <FontAwesome name="eye-slash" size={18} color="#8E8E93" />
-                )}
-              </Text>
-            </Pressable>
-          }
-          onSubmitEditing={() => setSecure1(true)}
-        />
-
-        {/* Confirm Password */}
-        <AuthTextField
-          label={
-            <Text style={[styles.label, { color: subTextColor }]}>
-              Confirm Password
-            </Text>
-          }
-          secureTextEntry={secure2}
-          placeholder="••••••••"
-          value={draft.confirmPassword}
-          onChangeText={(v) => setDraft({ confirmPassword: v })}
-          onBlur={() => setTouched((prev) => ({ ...prev, confirm: true }))}
-          error={confirmError}
-          rightElement={
-            <Pressable onPress={() => setSecure2(!secure2)}>
-              <Text style={styles.toggle}>
-                {secure2 ? (
-                  <FontAwesome name="eye" size={18} color="#8E8E93" />
-                ) : (
-                  <FontAwesome name="eye-slash" size={18} color="#8E8E93" />
-                )}
-              </Text>
-            </Pressable>
-          }
-          onSubmitEditing={() => setSecure2(true)}
-        />
-
-        {/* Continue Button */}
-        <Pressable
-          style={[
-            styles.primaryButton,
-            { opacity: isValid && !loading ? 1 : 0.5 },
-          ]}
-          onPress={() => {
-            setAttempted(true);
-            if (!isValid || loading) return;
-            next();
-          }}
-          disabled={!isValid || loading}
-        >
-          <Text style={styles.primaryButtonText}>
-            {loading ? 'Creating…' : 'Continue'}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={styles.privacyRow}
-          onPress={() =>
-            setDraft({ agreedToPrivacy: !draft.agreedToPrivacy })
-          }
-        >
-          <View
-            style={[
-              styles.checkbox,
-              draft.agreedToPrivacy && styles.checkboxChecked,
+      <KeyboardAvoidingView
+        style={styles.safeArea}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.card,
+              {
+                backgroundColor: cardColor,
+                paddingBottom: 24 + keyboardHeight,
+              },
             ]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            {draft.agreedToPrivacy ? (
-              <Text style={styles.checkboxTick}>✓</Text>
-            ) : null}
-          </View>
-          <Text style={styles.legalText}>
-            By proceeding further, you agree to our
-            <Text
-              style={styles.link}
-              onPress={() => setShowPrivacy(true)}
-            >
-              {' '}
-              privacy policy{' '}
+            <Text style={[styles.title, { color: textColor }]}>
+              Set a password
             </Text>
-            and provide your consent.
-          </Text>
-        </Pressable>
-        {privacyError ? (
-          <Text style={styles.privacyError}>{privacyError}</Text>
-        ) : null}
-        <Pressable style={styles.secondaryButton} onPress={() => router.back()}>
-          <Text style={styles.secondaryButtonText}>Return</Text>
-        </Pressable>
+            <Text style={[styles.subtitle, { color: subTextColor }]}>
+              Your password must be at least 6 characters
+            </Text>
 
-        <PrivacyPolicyModal
-          visible={showPrivacy}
-          onClose={() => setShowPrivacy(false)}
-        />
-      </View>
+            {/* Password */}
+            <AuthTextField
+              label={
+                <Text style={[styles.label, { color: subTextColor }]}>
+                  Password
+                </Text>
+              }
+              secureTextEntry={secure1}
+              placeholder="••••••••"
+              value={draft.password}
+              onChangeText={(v) => setDraft({ password: v })}
+              onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
+              error={passwordError}
+              rightElement={
+                <Pressable onPress={() => setSecure1(!secure1)}>
+                  <Text style={styles.toggle}>
+                    {secure1 ? (
+                      <FontAwesome name="eye" size={18} color="#8E8E93" />
+                    ) : (
+                      <FontAwesome name="eye-slash" size={18} color="#8E8E93" />
+                    )}
+                  </Text>
+                </Pressable>
+              }
+              onSubmitEditing={() => setSecure1(true)}
+            />
+
+            {/* Confirm Password */}
+            <AuthTextField
+              label={
+                <Text style={[styles.label, { color: subTextColor }]}>
+                  Confirm Password
+                </Text>
+              }
+              secureTextEntry={secure2}
+              placeholder="••••••••"
+              value={draft.confirmPassword}
+              onChangeText={(v) => setDraft({ confirmPassword: v })}
+              onBlur={() => setTouched((prev) => ({ ...prev, confirm: true }))}
+              error={confirmError}
+              rightElement={
+                <Pressable onPress={() => setSecure2(!secure2)}>
+                  <Text style={styles.toggle}>
+                    {secure2 ? (
+                      <FontAwesome name="eye" size={18} color="#8E8E93" />
+                    ) : (
+                      <FontAwesome name="eye-slash" size={18} color="#8E8E93" />
+                    )}
+                  </Text>
+                </Pressable>
+              }
+              onSubmitEditing={() => setSecure2(true)}
+            />
+
+            {/* Continue Button */}
+            <Pressable
+              style={[
+                styles.primaryButton,
+                { opacity: isValid && !loading ? 1 : 0.5 },
+              ]}
+              onPress={() => {
+                setAttempted(true);
+                if (!isValid || loading) return;
+                next();
+              }}
+              disabled={!isValid || loading}
+            >
+              <Text style={styles.primaryButtonText}>
+                {loading ? 'Creating…' : 'Continue'}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.privacyRow}
+              onPress={() =>
+                setDraft({ agreedToPrivacy: !draft.agreedToPrivacy })
+              }
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  draft.agreedToPrivacy && styles.checkboxChecked,
+                ]}
+              >
+                {draft.agreedToPrivacy ? (
+                  <Text style={styles.checkboxTick}>✓</Text>
+                ) : null}
+              </View>
+              <Text style={styles.legalText}>
+                By proceeding further, you agree to our
+                <Text style={styles.link} onPress={() => setShowPrivacy(true)}>
+                  {' '}
+                  privacy policy{' '}
+                </Text>
+                and provide your consent.
+              </Text>
+            </Pressable>
+            {privacyError ? (
+              <Text style={styles.privacyError}>{privacyError}</Text>
+            ) : null}
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.secondaryButtonText}>Return</Text>
+            </Pressable>
+
+            <PrivacyPolicyModal
+              visible={showPrivacy}
+              onClose={() => setShowPrivacy(false)}
+            />
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -214,8 +285,8 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    flex: 1,
     paddingTop: 32,
+    paddingBottom: 24,
     marginHorizontal: 20,
     borderRadius: 20,
   },

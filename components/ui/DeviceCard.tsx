@@ -235,10 +235,15 @@ export const DeviceCard = ({
           <Pressable
             style={styles.viewMapBtn}
             onPress={() => {
-              router.dismissTo({
-                pathname: ROUTES.APP.MAP,
+              const target = {
+                pathname: ROUTES.MAP.ROOT,
                 params: { focusDeviceId: device.device_id },
-              });
+              };
+              if (router.canDismiss()) {
+                router.dismissTo(target);
+              } else {
+                router.replace(target);
+              }
             }}
           >
             <FontAwesome name="map-marker" size={14} color="#fff" />

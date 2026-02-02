@@ -93,7 +93,18 @@ export async function getMeAPI(token: string) {
     },
   });
 
-  if (!res.ok) throw new Error('Unauthorized');
+  if (!res.ok) {
+    let message = 'Request failed';
+    try {
+      const err = await res.json();
+      message = err?.message || message;
+    } catch {
+      // ignore parse errors
+    }
+    const error: any = new Error(message);
+    error.status = res.status;
+    throw error;
+  }
 
   const data = await res.json();
   return data.user;
