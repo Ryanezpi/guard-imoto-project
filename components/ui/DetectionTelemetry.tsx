@@ -1,16 +1,16 @@
-import React, { useCallback, useEffect, useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  ActivityIndicator,
-  StyleSheet,
-  SectionList,
-  Pressable,
-} from 'react-native';
+import DateTimePill from '@/components/ui/DateTimePill';
 import { useTheme } from '@/context/ThemeContext';
 import { getDetectionsTelemetry, resolveAlert } from '@/services/user.service';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import DateTimePill from '@/components/ui/DateTimePill';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  SectionList,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 interface DetectionTelemetryProps {
   deviceId: string;
@@ -117,7 +117,7 @@ export function DetectionTelemetry({
         )
       );
     } catch (e) {
-      console.error('[RESOLVE ALERTS]', e);
+      console.log('[RESOLVE ALERTS]', e);
     } finally {
       setResolving(false);
     }
@@ -135,7 +135,7 @@ export function DetectionTelemetry({
           )
         );
       } catch (e) {
-        console.error('[RESOLVE ALERT]', e);
+        console.log('[RESOLVE ALERT]', e);
       } finally {
         setResolving(false);
       }

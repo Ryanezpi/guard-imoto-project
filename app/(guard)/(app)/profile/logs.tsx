@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import DynamicList, { DynamicListItem } from '@/components/ui/DynamicList';
-import { useTheme } from '@/context/ThemeContext';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import DevicePrefix from '@/components/ui/DevicePrefix';
-import { AuditLog, getMyAuditLogs } from '@/services/user.service';
-import { useAuth } from '@/context/AuthContext';
 import DateTimePill from '@/components/ui/DateTimePill';
+import DevicePrefix from '@/components/ui/DevicePrefix';
+import DynamicList, { DynamicListItem } from '@/components/ui/DynamicList';
+import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
+import { AuditLog, getMyAuditLogs } from '@/services/user.service';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const actionLabelMap: Record<string, string> = {
   updated_profile: 'Updated profile',
@@ -61,7 +61,7 @@ export default function AuditLogsScreen() {
         const data = await getMyAuditLogs(idToken);
         if (mounted) setLogs(data);
       } catch (err) {
-        console.error('Failed to load audit logs', err);
+        console.log('Failed to load audit logs', err);
       } finally {
         if (mounted) setLoading(false);
       }

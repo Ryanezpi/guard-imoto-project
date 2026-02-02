@@ -1,23 +1,19 @@
 import { ROUTES } from '@/constants/routes';
+import AuthTextField from '@/components/ui/forms/AuthTextField';
+import { useCreateAccountDraft } from '@/context/CreateAccountContext';
 import { useLoader } from '@/context/LoaderContext';
 import { useTheme } from '@/context/ThemeContext';
 import { auth } from '@/lib/firebase';
 import { registerUserWithBackend } from '@/services/auth.service';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { useRouter } from 'expo-router';
+import { createUserWithEmailAndPassword } from '@react-native-firebase/auth';
+import PrivacyPolicyModal from '@/components/ui/PrivacyPolicyModal';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function PasswordStep() {
-  const params = useLocalSearchParams<{
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-  }>();
-
   const router = useRouter();
   const { theme } = useTheme();
   const { showLoader, hideLoader } = useLoader();
@@ -25,21 +21,46 @@ export default function PasswordStep() {
   const cardColor = theme === 'light' ? '#ffffff' : '#1f1f1f';
   const textColor = theme === 'light' ? '#111827' : '#f9fafb';
   const subTextColor = theme === 'light' ? '#1C1C1E' : '#9ca3af';
-  const borderColor = theme === 'light' ? '#d1d5db' : '#3f3f46';
 
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
+  const { draft, setDraft } = useCreateAccountDraft();
   const [secure1, setSecure1] = useState(true);
   const [secure2, setSecure2] = useState(true);
   const [isValid, setIsValid] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const [touched, setTouched] = useState({
+    password: false,
+    confirm: false,
+  });
 
   // Enable continue button only if both fields are non-empty and match
   useEffect(() => {
     setIsValid(
-      password.length >= 6 && confirm.length >= 6 && password === confirm
+      draft.password.length >= 6 &&
+        draft.confirmPassword.length >= 6 &&
+        draft.password === draft.confirmPassword &&
+        draft.agreedToPrivacy
     );
-  }, [password, confirm]);
+  }, [draft.confirmPassword, draft.password, draft.agreedToPrivacy]);
+
+  const passwordError =
+    (attempted || touched.password) && draft.password.length === 0
+      ? 'Password is required.'
+      : (attempted || touched.password) && draft.password.length < 6
+        ? 'Password must be at least 6 characters.'
+        : undefined;
+  const confirmError =
+    (attempted || touched.confirm) && draft.confirmPassword.length === 0
+      ? 'Please confirm your password.'
+      : (attempted || touched.confirm) &&
+          draft.confirmPassword !== draft.password
+        ? 'Passwords do not match.'
+        : undefined;
+  const privacyError =
+    attempted && !draft.agreedToPrivacy
+      ? 'You must agree to the privacy policy.'
+      : undefined;
 
   const next = async () => {
     if (!isValid || loading) return;
@@ -49,14 +70,14 @@ export default function PasswordStep() {
       showLoader();
       const res = await createUserWithEmailAndPassword(
         auth,
-        params.email as string,
-        password
+        draft.email,
+        draft.password
       );
 
       await registerUserWithBackend(res.user, {
-        first_name: params.firstName as string,
-        last_name: params.lastName as string,
-        phone: params.phone as string,
+        first_name: draft.firstName,
+        last_name: draft.lastName,
+        phone: draft.phone,
       });
       hideLoader();
       router.replace(ROUTES.AUTH.CREATE_ACCOUNT.EMAIL_VERIFICATION);
@@ -77,18 +98,15 @@ export default function PasswordStep() {
         </Text>
 
         {/* Password */}
-        <View style={styles.field}>
-          <Text style={[styles.label, { color: subTextColor }]}>Password</Text>
-          <View style={[styles.passwordRow, { borderColor }]}>
-            <TextInput
-              style={[styles.passwordInput, { color: textColor }]}
-              secureTextEntry={secure1}
-              placeholder="••••••••"
-              placeholderTextColor={subTextColor}
-              value={password}
-              onChangeText={setPassword}
-              onBlur={() => setSecure1(true)}
-            />
+        <AuthTextField
+          label={<Text style={[styles.label, { color: subTextColor }]}>Password</Text>}
+          secureTextEntry={secure1}
+          placeholder="••••••••"
+          value={draft.password}
+          onChangeText={(v) => setDraft({ password: v })}
+          onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
+          error={passwordError}
+          rightElement={
             <Pressable onPress={() => setSecure1(!secure1)}>
               <Text style={styles.toggle}>
                 {secure1 ? (
@@ -98,24 +116,24 @@ export default function PasswordStep() {
                 )}
               </Text>
             </Pressable>
-          </View>
-        </View>
+          }
+          onSubmitEditing={() => setSecure1(true)}
+        />
 
         {/* Confirm Password */}
-        <View style={styles.field}>
-          <Text style={[styles.label, { color: subTextColor }]}>
-            Confirm Password
-          </Text>
-          <View style={[styles.passwordRow, { borderColor }]}>
-            <TextInput
-              style={[styles.passwordInput, { color: textColor }]}
-              secureTextEntry={secure2}
-              placeholder="••••••••"
-              placeholderTextColor={subTextColor}
-              value={confirm}
-              onChangeText={setConfirm}
-              onBlur={() => setSecure2(true)}
-            />
+        <AuthTextField
+          label={
+            <Text style={[styles.label, { color: subTextColor }]}>
+              Confirm Password
+            </Text>
+          }
+          secureTextEntry={secure2}
+          placeholder="••••••••"
+          value={draft.confirmPassword}
+          onChangeText={(v) => setDraft({ confirmPassword: v })}
+          onBlur={() => setTouched((prev) => ({ ...prev, confirm: true }))}
+          error={confirmError}
+          rightElement={
             <Pressable onPress={() => setSecure2(!secure2)}>
               <Text style={styles.toggle}>
                 {secure2 ? (
@@ -125,8 +143,9 @@ export default function PasswordStep() {
                 )}
               </Text>
             </Pressable>
-          </View>
-        </View>
+          }
+          onSubmitEditing={() => setSecure2(true)}
+        />
 
         {/* Continue Button */}
         <Pressable
@@ -134,16 +153,56 @@ export default function PasswordStep() {
             styles.primaryButton,
             { opacity: isValid && !loading ? 1 : 0.5 },
           ]}
-          onPress={next}
+          onPress={() => {
+            setAttempted(true);
+            if (!isValid || loading) return;
+            next();
+          }}
           disabled={!isValid || loading}
         >
           <Text style={styles.primaryButtonText}>
             {loading ? 'Creating…' : 'Continue'}
           </Text>
         </Pressable>
+        <Pressable
+          style={styles.privacyRow}
+          onPress={() =>
+            setDraft({ agreedToPrivacy: !draft.agreedToPrivacy })
+          }
+        >
+          <View
+            style={[
+              styles.checkbox,
+              draft.agreedToPrivacy && styles.checkboxChecked,
+            ]}
+          >
+            {draft.agreedToPrivacy ? (
+              <Text style={styles.checkboxTick}>✓</Text>
+            ) : null}
+          </View>
+          <Text style={styles.legalText}>
+            By proceeding further, you agree to our
+            <Text
+              style={styles.link}
+              onPress={() => setShowPrivacy(true)}
+            >
+              {' '}
+              privacy policy{' '}
+            </Text>
+            and provide your consent.
+          </Text>
+        </Pressable>
+        {privacyError ? (
+          <Text style={styles.privacyError}>{privacyError}</Text>
+        ) : null}
         <Pressable style={styles.secondaryButton} onPress={() => router.back()}>
           <Text style={styles.secondaryButtonText}>Return</Text>
         </Pressable>
+
+        <PrivacyPolicyModal
+          visible={showPrivacy}
+          onClose={() => setShowPrivacy(false)}
+        />
       </View>
     </SafeAreaView>
   );
@@ -172,28 +231,10 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
 
-  field: {
-    marginBottom: 18,
-  },
-
   label: {
     fontSize: 13,
     marginBottom: 6,
     fontWeight: '500',
-  },
-
-  passwordRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 48,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-  },
-
-  passwordInput: {
-    flex: 1,
-    fontSize: 16,
   },
 
   toggle: {
@@ -228,5 +269,45 @@ const styles = StyleSheet.create({
     color: '#9F0EA1',
     fontSize: 18,
     fontWeight: '600',
+  },
+  privacyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 18,
+    gap: 10,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#9F0EA1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: '#9F0EA1',
+  },
+  checkboxTick: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  legalText: {
+    fontSize: 12,
+    color: '#333',
+    lineHeight: 18,
+    flex: 1,
+  },
+  link: {
+    color: '#9F0EA1',
+    textDecorationLine: 'none',
+  },
+  privacyError: {
+    color: '#dc2626',
+    fontSize: 12,
+    marginTop: -10,
+    marginBottom: 10,
   },
 });

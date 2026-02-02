@@ -1,23 +1,25 @@
 import DynamicCard from '@/components/ui/Card';
+import ConfirmModal, {
+  type AlertAction,
+} from '@/components/ui/forms/ConfirmModal';
+import SegmentToggle from '@/components/ui/SegmentToggle';
 import TitleSection from '@/components/ui/TitleSection';
-import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, View, Text } from 'react-native';
-import { useTheme } from '@/context/ThemeContext';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ROUTES } from '@/constants/routes';
-import { router } from 'expo-router';
-import { signOut } from 'firebase/auth';
+import { useAuth } from '@/context/AuthContext';
+import { useLoader } from '@/context/LoaderContext';
+import { useTheme } from '@/context/ThemeContext';
 import { auth } from '@/lib/firebase';
+import { updateProfile } from '@/services/user.service';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getIdToken, signOut } from '@react-native-firebase/auth';
 import * as Clipboard from 'expo-clipboard';
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import * as Linking from 'expo-linking';
-import { useAuth } from '@/context/AuthContext';
-import { updateProfile } from '@/services/user.service';
-import { useLoader } from '@/context/LoaderContext';
-import ConfirmModal, { type AlertAction } from '@/components/ui/forms/ConfirmModal';
-import SegmentToggle from '@/components/ui/SegmentToggle';
+import * as Notifications from 'expo-notifications';
+import { router } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
   const { theme, setTheme } = useTheme();
@@ -44,9 +46,9 @@ export default function SettingsScreen() {
         visible: true,
         title,
         message,
-        actions:
-          actions ??
-          [{ text: 'OK', variant: 'primary', onPress: closeAlert }],
+        actions: actions ?? [
+          { text: 'OK', variant: 'primary', onPress: closeAlert },
+        ],
       }),
     [closeAlert]
   );
@@ -65,7 +67,7 @@ export default function SettingsScreen() {
       console.log('App storage and Auth cleared!');
       router.replace(ROUTES.AUTH.LOGIN);
     } catch (e) {
-      console.error('Failed to reset app', e);
+      console.log('Failed to reset app', e);
     } finally {
       hideLoader();
     }
@@ -76,7 +78,7 @@ export default function SettingsScreen() {
       showLoader();
       const user = auth.currentUser;
       if (user) {
-        const idToken = await user.getIdToken(true);
+        const idToken = await getIdToken(user, true);
         await Clipboard.setStringAsync(idToken);
         openAlert(
           'Auth Token Copied',
@@ -128,17 +130,21 @@ export default function SettingsScreen() {
 
     // Still denied → force user to settings
     if (finalStatus !== 'granted') {
-      openAlert('Notifications Disabled', 'Please enable notifications in system settings to receive alerts.', [
-        { text: 'Cancel', variant: 'cancel', onPress: closeAlert },
-        {
-          text: 'Open Settings',
-          variant: 'primary',
-          onPress: () => {
-            closeAlert();
-            Linking.openSettings();
+      openAlert(
+        'Notifications Disabled',
+        'Please enable notifications in system settings to receive alerts.',
+        [
+          { text: 'Cancel', variant: 'cancel', onPress: closeAlert },
+          {
+            text: 'Open Settings',
+            variant: 'primary',
+            onPress: () => {
+              closeAlert();
+              Linking.openSettings();
+            },
           },
-        },
-      ]);
+        ]
+      );
 
       // Ensure toggle stays OFF
       setPushNotificationsEnabled(false);
@@ -225,7 +231,11 @@ export default function SettingsScreen() {
           />
         </TitleSection>
 
-        {/* --- Developer Section --- */}
+        {/*
+          --- Developer Section ---
+          Uncomment when needed.
+        */}
+        {/*
         <TitleSection title="Developer Tools">
           <DynamicCard
             name="Copy ID Token (JWT)"
@@ -239,6 +249,7 @@ export default function SettingsScreen() {
             onPress={resetApp}
           />
         </TitleSection>
+        */}
 
         <View style={{ paddingBottom: 12 }}>
           <DynamicCard
@@ -254,7 +265,7 @@ export default function SettingsScreen() {
                 await AsyncStorage.multiRemove(['theme', 'onboardingSeen']);
                 router.replace(ROUTES.AUTH.LOGIN);
               } catch (err) {
-                console.error('Logout failed', err);
+                console.log('Logout failed', err);
               } finally {
                 hideLoader();
               }

@@ -1,12 +1,12 @@
+import { HeaderEditButton } from '@/components/ui/HeaderEditButton';
+import NavButton from '@/components/ui/NavButton';
 import { ROUTES } from '@/constants/routes';
+import { useAuth } from '@/context/AuthContext';
+import { ThemeProvider, useTheme } from '@/context/ThemeContext';
+import { getMyAlerts } from '@/services/user.service';
 import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Text, Image, StyleSheet, View } from 'react-native';
-import { ThemeProvider, useTheme } from '@/context/ThemeContext';
-import NavButton from '@/components/ui/NavButton';
-import { HeaderEditButton } from '@/components/ui/HeaderEditButton';
-import { useAuth } from '@/context/AuthContext';
-import { getMyAlerts } from '@/services/user.service';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 function LayoutContent() {
   const { theme } = useTheme();
@@ -31,7 +31,7 @@ function LayoutContent() {
       );
       setHasAlertBadge(hasUnresolved);
     } catch (e) {
-      console.error('[ALERT BADGE]', e);
+      console.log('[ALERT BADGE]', e);
     }
   }, [idToken]);
 
@@ -77,10 +77,7 @@ function LayoutContent() {
               />
               {hasAlertBadge && (
                 <View
-                  style={[
-                    styles.badgeDot,
-                    { backgroundColor: badgeColor },
-                  ]}
+                  style={[styles.badgeDot, { backgroundColor: badgeColor }]}
                 />
               )}
             </View>

@@ -193,7 +193,7 @@ export default function ConfirmModal({
                   flexDirection: useStacked ? 'column' : 'row',
                   justifyContent: useStacked ? 'flex-start' : 'flex-end',
                   gap: 10,
-                  width: fullWidthActions ? '100%' : undefined,
+                  width: '100%',
                 }}
               >
                 {resolvedActions.map((action, idx) => (
@@ -201,7 +201,10 @@ export default function ConfirmModal({
                     key={`${action.text}-${idx}`}
                     onPress={action.onPress}
                     style={{
-                      width: useStacked ? '100%' : 120,
+                      flex: useStacked ? 0 : 1,
+                      width: useStacked ? '100%' : undefined,
+                      minWidth: useStacked ? undefined : 120,
+                      maxWidth: useStacked ? undefined : 180,
                       paddingVertical: 10,
                       paddingHorizontal: 16,
                       borderRadius: 10,
@@ -216,6 +219,9 @@ export default function ConfirmModal({
                         fontSize: 15,
                         fontWeight: '700',
                       }}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
                     >
                       {action.text}
                     </Text>
@@ -231,7 +237,9 @@ export default function ConfirmModal({
                 <TouchableOpacity
                   onPress={handleCancel}
                   style={{
-                    width: 120,
+                    flex: 1,
+                    minWidth: 120,
+                    maxWidth: 180,
                     paddingVertical: 10,
                     paddingHorizontal: 14,
                     borderRadius: 10,
@@ -247,6 +255,9 @@ export default function ConfirmModal({
                       fontSize: 15,
                       fontWeight: '600',
                     }}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
                   >
                     {cancelText}
                   </Text>
@@ -255,7 +266,9 @@ export default function ConfirmModal({
                 <TouchableOpacity
                   onPress={handleConfirm}
                   style={{
-                    width: 120,
+                    flex: 1,
+                    minWidth: 120,
+                    maxWidth: 180,
                     paddingVertical: 10,
                     paddingHorizontal: 16,
                     borderRadius: 10,
@@ -269,6 +282,9 @@ export default function ConfirmModal({
                       fontSize: 15,
                       fontWeight: '700',
                     }}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
                   >
                     {confirmText}
                   </Text>

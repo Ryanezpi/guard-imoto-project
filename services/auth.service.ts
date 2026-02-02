@@ -1,4 +1,4 @@
-import { User } from 'firebase/auth';
+import { getIdToken, type FirebaseAuthTypes } from '@react-native-firebase/auth';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
 
@@ -9,7 +9,7 @@ export type RegisterPayload = {
 };
 
 export async function registerUserWithBackend(
-  user: User,
+  user: FirebaseAuthTypes.User,
   payload: RegisterPayload
 ) {
   if (!user) {
@@ -17,7 +17,7 @@ export async function registerUserWithBackend(
   }
 
   // 1. Get Firebase ID token
-  const token = await user.getIdToken(true);
+  const token = await getIdToken(user, true);
 
   // 2. Call backend
   const res = await fetch(`${API_BASE}/auth/register`, {

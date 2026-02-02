@@ -1,36 +1,36 @@
 import AddDeviceCard from '@/components/ui/AddDeviceCard';
 import { DeviceCard } from '@/components/ui/DeviceCard';
+import AuthTextField from '@/components/ui/forms/AuthTextField';
+import ConfirmModal, {
+  type AlertAction,
+} from '@/components/ui/forms/ConfirmModal';
 import { useAuth } from '@/context/AuthContext';
 import { useDevices } from '@/context/DeviceContext';
-import { useTheme } from '@/context/ThemeContext';
 import { useLoader } from '@/context/LoaderContext';
+import { useTheme } from '@/context/ThemeContext';
 import {
   getDeviceNFCs,
   getMyAlerts,
   pairDevice,
 } from '@/services/user.service';
-import AuthTextField from '@/components/ui/forms/AuthTextField';
 import {
   BarcodeScanningResult,
   CameraType,
   CameraView,
   useCameraPermissions,
 } from 'expo-camera';
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import ConfirmModal, {
-  type AlertAction,
-} from '@/components/ui/forms/ConfirmModal';
 
 export default function MapDevicesScreen() {
   const { theme } = useTheme();
@@ -106,7 +106,7 @@ export default function MapDevicesScreen() {
       });
       setUnresolvedByDevice(counts);
     } catch (e) {
-      console.error('[ALERTS]', e);
+      console.log('[ALERTS]', e);
     }
   }, [idToken]);
 
@@ -119,14 +119,14 @@ export default function MapDevicesScreen() {
             const res = await getDeviceNFCs(idToken, device.device_id);
             return [device.device_id, res?.length ?? 0] as const;
           } catch (e) {
-            console.error('[NFC]', device.device_id, e);
+            console.log('[NFC]', device.device_id, e);
             return [device.device_id, 0] as const;
           }
         })
       );
       setNfcByDevice(Object.fromEntries(entries));
     } catch (e) {
-      console.error('[NFC]', e);
+      console.log('[NFC]', e);
       setNfcByDevice({});
     }
   }, [idToken, initial_devices]);
@@ -164,7 +164,7 @@ export default function MapDevicesScreen() {
       } else {
         openAlert('Error', msg || 'Failed to add device or invalid QR.');
       }
-      console.error(err);
+      console.log(err);
     } finally {
       hideLoader();
       setScanning(false);
@@ -205,7 +205,7 @@ export default function MapDevicesScreen() {
       } else {
         openAlert('Error', msg || 'Failed to add device.');
       }
-      console.error(err);
+      console.log(err);
     } finally {
       hideLoader();
       setAddingDevice(false);

@@ -1,17 +1,19 @@
 import { ROUTES } from '@/constants/routes';
+import AuthTextField from '@/components/ui/forms/AuthTextField';
 import { useLoader } from '@/context/LoaderContext';
 import { useTheme } from '@/context/ThemeContext';
 import { auth } from '@/lib/firebase';
+import ConfirmModal, { type AlertAction } from '@/components/ui/forms/ConfirmModal';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { useState, useRef } from 'react';
+import { signInWithEmailAndPassword } from '@react-native-firebase/auth';
+import { useRef, useState } from 'react';
 import {
   Image,
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
+  type TextInput,
   View,
   Keyboard,
   KeyboardAvoidingView,
@@ -25,28 +27,57 @@ export default function Login() {
   const router = useRouter();
   const { theme } = useTheme();
   const { showLoader, hideLoader } = useLoader();
-  const passwordRef = useRef<TextInput>(null);
-
   const bgColor = theme === 'light' ? '#ffffff' : '#272727';
   const cardColor = theme === 'light' ? '#ffffff' : '#272727';
   const textColor = theme === 'light' ? '#111827' : '#f9fafb';
   const subTextColor = theme === 'light' ? '#1C1C1E' : '#9ca3af';
-  const borderColor = theme === 'light' ? '#d1d5db' : '#3f3f46';
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [secure, setSecure] = useState(true);
   const [loading, setLoading] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
+  const [attempted, setAttempted] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    title?: string;
+    message?: string;
+    actions: AlertAction[];
+  }>({ visible: false, actions: [] });
+
+  const closeAlert = () => setAlert((prev) => ({ ...prev, visible: false }));
+  const openAlert = (title: string, message: string) =>
+    setAlert({
+      visible: true,
+      title,
+      message,
+      actions: [{ text: 'OK', variant: 'primary', onPress: closeAlert }],
+    });
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailError =
+    (attempted || emailTouched) && !email.trim()
+      ? 'Email is required.'
+      : (attempted || emailTouched) && !emailRegex.test(email.trim())
+        ? 'Enter a valid email address.'
+        : undefined;
+  const passwordError =
+    (attempted || passwordTouched) && !password
+      ? 'Password is required.'
+      : undefined;
 
   const login = async () => {
     try {
+      setAttempted(true);
+      if (emailError || passwordError) return;
       setLoading(true);
       showLoader();
       setSecure(true);
       await signInWithEmailAndPassword(auth, email.trim(), password);
     } catch (e: any) {
       hideLoader();
-      alert(e.message);
+      openAlert('Login failed', e.message ?? 'Unable to login.');
     } finally {
       setLoading(false);
     }
@@ -81,43 +112,48 @@ export default function Login() {
               </Text>
 
               {/* Email */}
-              <View style={styles.field}>
-                <Text style={[styles.label, { color: subTextColor }]}>
-                  Email
-                </Text>
-                <TextInput
-                  style={[styles.input, { borderColor, color: textColor }]}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  placeholder="you@email.com"
-                  placeholderTextColor={subTextColor}
-                  value={email}
-                  onChangeText={setEmail}
-                  returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
-                />
-              </View>
+              <AuthTextField
+                label={
+                  <Text style={[styles.label, { color: subTextColor }]}>
+                    Email
+                  </Text>
+                }
+                autoCapitalize="none"
+                keyboardType="email-address"
+                placeholder="you@email.com"
+                value={email}
+                onChangeText={setEmail}
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onBlur={() => setEmailTouched(true)}
+                onSubmitEditing={() => {
+                  passwordRef.current?.focus?.();
+                }}
+                error={emailError}
+              />
 
               {/* Password */}
-              <View style={styles.field}>
-                <Text style={[styles.label, { color: subTextColor }]}>
-                  Password
-                </Text>
-
-                <View style={[styles.passwordRow, { borderColor }]}>
-                  <TextInput
-                    ref={passwordRef}
-                    style={[styles.passwordInput, { color: textColor }]}
-                    secureTextEntry={secure}
-                    placeholder="••••••••"
-                    placeholderTextColor={subTextColor}
-                    value={password}
-                    onChangeText={setPassword}
-                    returnKeyType="done"
-                    onSubmitEditing={login}
-                  />
-
-                  <Pressable onPress={() => setSecure(!secure)}>
+              <AuthTextField
+                label={
+                  <Text style={[styles.label, { color: subTextColor }]}>
+                    Password
+                  </Text>
+                }
+                secureTextEntry={secure}
+                placeholder="••••••••"
+                value={password}
+                onChangeText={setPassword}
+                returnKeyType="done"
+                onSubmitEditing={login}
+                inputRef={passwordRef}
+                onBlur={() => setPasswordTouched(true)}
+                error={passwordError}
+                rightElement={
+                  <Pressable
+                    onPress={() => setSecure(!secure)}
+                    focusable={false}
+                    accessible={false}
+                  >
                     <Text style={styles.toggle}>
                       {secure ? (
                         <FontAwesome name="eye" size={18} color="#8E8E93" />
@@ -130,8 +166,8 @@ export default function Login() {
                       )}
                     </Text>
                   </Pressable>
-                </View>
-              </View>
+                }
+              />
 
               {/* Login Button */}
               <Pressable
@@ -167,6 +203,15 @@ export default function Login() {
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+      <ConfirmModal
+        visible={alert.visible}
+        title={alert.title}
+        actions={alert.actions}
+        onCancel={closeAlert}
+        onDismiss={closeAlert}
+      >
+        {alert.message ? <Text>{alert.message}</Text> : null}
+      </ConfirmModal>
     </SafeAreaView>
   );
 }

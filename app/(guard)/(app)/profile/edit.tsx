@@ -1,28 +1,28 @@
-import React, { useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  Pressable,
-  ScrollView,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import * as ImagePicker from 'expo-image-picker';
-import { useTheme } from '@/context/ThemeContext';
-import { useAuth } from '@/context/AuthContext';
 import DynamicCard from '@/components/ui/Card';
-import TitleSection from '@/components/ui/TitleSection';
-import { updateProfile, uploadAvatar } from '@/services/user.service';
-import { sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { useLoader } from '@/context/LoaderContext';
+import AuthTextField from '@/components/ui/forms/AuthTextField';
 import ConfirmModal, {
   type AlertAction,
 } from '@/components/ui/forms/ConfirmModal';
-import AuthTextField from '@/components/ui/forms/AuthTextField';
+import TitleSection from '@/components/ui/TitleSection';
+import { useAuth } from '@/context/AuthContext';
+import { useLoader } from '@/context/LoaderContext';
+import { useTheme } from '@/context/ThemeContext';
+import { auth } from '@/lib/firebase';
+import { updateProfile, uploadAvatar } from '@/services/user.service';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { sendPasswordResetEmail } from '@react-native-firebase/auth';
 import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import React, { useCallback } from 'react';
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export const screenOptions = {
   headerTitle: 'Profile',
@@ -313,7 +313,7 @@ export default function EditScreen() {
                 ]
               );
             } catch (err) {
-              console.error('Failed to send reset email:', err);
+              console.log('Failed to send reset email:', err);
               openAlert('Error', 'Failed to send reset email. Try again.', [
                 {
                   text: 'OK',

@@ -1,7 +1,9 @@
 import { ROUTES } from '@/constants/routes';
+import AuthTextField from '@/components/ui/forms/AuthTextField';
+import { useCreateAccountDraft } from '@/context/CreateAccountContext';
 import { useTheme } from '@/context/ThemeContext';
 import { checkEmailAvailability } from '@/services/auth.service';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -10,7 +12,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
@@ -24,43 +25,20 @@ export default function CreateAccount() {
   const cardColor = theme === 'light' ? '#ffffff' : '#272727';
   const textColor = theme === 'light' ? '#111827' : '#f9fafb';
   const subTextColor = theme === 'light' ? '#1C1C1E' : '#9ca3af';
-  const borderColor = theme === 'light' ? '#d1d5db' : '#3f3f46';
 
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isValid, setIsValid] = useState(false);
   const [checkingEmail, setCheckingEmail] = useState(false);
-  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
-
-  const params = useLocalSearchParams<{
-    firstName?: string;
-    lastName?: string;
-    email?: string;
-    phone?: string;
-  }>();
-
-  const [form, setForm] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
+  const [attempted, setAttempted] = useState(false);
+  const [touched, setTouched] = useState({
+    firstName: false,
+    lastName: false,
+    email: false,
+    phone: false,
   });
 
-  const hydratedRef = useRef(false);
-
-  useEffect(() => {
-    if (hydratedRef.current) return;
-    if (!params.firstName) return;
-
-    setForm({
-      firstName: params.firstName,
-      lastName: params.lastName ?? '',
-      email: params.email ?? '',
-      phone: params.phone ?? '',
-    });
-
-    hydratedRef.current = true;
-  }, [params.email, params.firstName, params.lastName, params.phone]);
+  const { draft, setDraft, resetDraft } = useCreateAccountDraft();
 
   // Validation rules
   useEffect(() => {
@@ -68,14 +46,41 @@ export default function CreateAccount() {
     const phoneRegex = /^09\d{9}$/;
 
     const valid =
-      form.firstName.trim().length > 0 &&
-      form.lastName.trim().length > 0 &&
-      emailRegex.test(form.email) &&
-      phoneRegex.test(form.phone) &&
-      emailAvailable === true;
+      draft.firstName.trim().length > 0 &&
+      draft.lastName.trim().length > 0 &&
+      emailRegex.test(draft.email) &&
+      phoneRegex.test(draft.phone) &&
+      draft.emailAvailable === true;
 
     setIsValid(valid);
-  }, [form, emailAvailable]);
+  }, [draft]);
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const phoneRegex = /^09\d{9}$/;
+  const firstNameError =
+    (attempted || touched.firstName) && !draft.firstName.trim()
+      ? 'First name is required.'
+      : undefined;
+  const lastNameError =
+    (attempted || touched.lastName) && !draft.lastName.trim()
+      ? 'Last name is required.'
+      : undefined;
+  const emailFieldError =
+    (attempted || touched.email) && !draft.email.trim()
+      ? 'Email is required.'
+      : (attempted || touched.email) && !emailRegex.test(draft.email.trim())
+        ? 'Enter a valid email address.'
+        : emailError
+          ? emailError
+          : draft.emailAvailable === false
+            ? 'Email is already registered.'
+            : undefined;
+  const phoneError =
+    (attempted || touched.phone) && !draft.phone.trim()
+      ? 'Phone number is required.'
+      : (attempted || touched.phone) && !phoneRegex.test(draft.phone.trim())
+        ? 'Enter a valid 11-digit PH mobile number (09XXXXXXXXX).'
+        : undefined;
 
   async function handleEmailCheck(email: string) {
     if (!email) return;
@@ -85,9 +90,9 @@ export default function CreateAccount() {
 
     try {
       const available = await checkEmailAvailability(email);
-      setEmailAvailable(available);
+      setDraft({ emailAvailable: available, emailCheckedValue: email });
     } catch (err: any) {
-      setEmailAvailable(null);
+      setDraft({ emailAvailable: null, emailCheckedValue: '' });
       setEmailError(err.message || 'Unable to check email');
     } finally {
       setCheckingEmail(false);
@@ -109,123 +114,104 @@ export default function CreateAccount() {
             </Text>
 
             {/* First Name */}
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: subTextColor }]}>
-                First name <Text style={{ color: 'red' }}>*</Text>
-              </Text>
-              <TextInput
-                autoCapitalize="sentences"
-                style={[styles.input, { borderColor, color: textColor }]}
-                placeholder="John"
-                placeholderTextColor={subTextColor}
-                value={form.firstName}
-                onChangeText={(v) => setForm({ ...form, firstName: v })}
-              />
-            </View>
+            <AuthTextField
+              label={
+                <Text style={[styles.label, { color: subTextColor }]}>
+                  First name <Text style={{ color: 'red' }}>*</Text>
+                </Text>
+              }
+              placeholder="John"
+              value={draft.firstName}
+              onChangeText={(v) => setDraft({ firstName: v })}
+              onBlur={() =>
+                setTouched((prev) => ({ ...prev, firstName: true }))
+              }
+              error={firstNameError}
+            />
 
             {/* Last Name */}
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: subTextColor }]}>
-                Last name <Text style={{ color: 'red' }}>*</Text>
-              </Text>
-              <TextInput
-                autoCapitalize="sentences"
-                style={[styles.input, { borderColor, color: textColor }]}
-                placeholder="Doe"
-                placeholderTextColor={subTextColor}
-                value={form.lastName}
-                onChangeText={(v) => setForm({ ...form, lastName: v })}
-              />
-            </View>
+            <AuthTextField
+              label={
+                <Text style={[styles.label, { color: subTextColor }]}>
+                  Last name <Text style={{ color: 'red' }}>*</Text>
+                </Text>
+              }
+              placeholder="Doe"
+              value={draft.lastName}
+              onChangeText={(v) => setDraft({ lastName: v })}
+              onBlur={() => setTouched((prev) => ({ ...prev, lastName: true }))}
+              error={lastNameError}
+            />
 
             {/* Email */}
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: subTextColor }]}>
-                Email <Text style={{ color: 'red' }}>*</Text>
-              </Text>
-              <View
-                style={[
-                  styles.inputWrapper,
+            <AuthTextField
+              label={
+                <Text style={[styles.label, { color: subTextColor }]}>
+                  Email <Text style={{ color: 'red' }}>*</Text>
+                </Text>
+              }
+              autoCapitalize="none"
+              keyboardType="email-address"
+              placeholder="you@email.com"
+              value={draft.email}
+              onChangeText={(v) => {
+                setDraft({ email: v, emailAvailable: null, emailCheckedValue: '' });
 
-                  {
-                    borderColor:
-                      emailError || emailAvailable === false
-                        ? 'red'
-                        : borderColor,
-                  },
-                ]}
-              >
-                <TextInput
-                  style={[styles.inputInner, { color: textColor }]}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  placeholder="you@email.com"
-                  placeholderTextColor={subTextColor}
-                  value={form.email}
-                  onChangeText={(v) => {
-                    setForm((prev) => ({ ...prev, email: v }));
-                    setEmailAvailable(null);
+                if (typingTimeout.current) clearTimeout(typingTimeout.current);
 
-                    if (typingTimeout.current)
-                      clearTimeout(typingTimeout.current);
-
-                    typingTimeout.current = setTimeout(() => {
-                      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                      if (emailRegex.test(v)) {
-                        handleEmailCheck(v);
-                      }
-                    }, 500);
-                  }}
-                />
-                {checkingEmail && (
+                typingTimeout.current = setTimeout(() => {
+                  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                  if (
+                    emailRegex.test(v) &&
+                    !(draft.emailCheckedValue === v && draft.emailAvailable === true)
+                  ) {
+                    handleEmailCheck(v);
+                  }
+                }, 500);
+              }}
+              onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
+              rightElement={
+                checkingEmail ? (
                   <ActivityIndicator size="small" color="#9F0EA1" />
-                )}
-                {!checkingEmail && emailAvailable === true && (
-                  <Text style={{ color: 'green', marginRight: 6 }}>✓</Text>
-                )}
-                {!checkingEmail && emailAvailable === false && (
-                  <Text style={{ color: 'red', marginRight: 6 }}>✕</Text>
-                )}
-              </View>
-            </View>
+                ) : draft.emailAvailable === true ? (
+                  <Text style={{ color: 'green' }}>✓</Text>
+                ) : draft.emailAvailable === false ? (
+                  <Text style={{ color: 'red' }}>✕</Text>
+                ) : null
+              }
+              error={emailFieldError}
+            />
 
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: subTextColor }]}>
-                Phone number
-              </Text>
-              <TextInput
-                style={[styles.input, { borderColor, color: textColor }]}
-                keyboardType="phone-pad"
-                placeholder="09XXxxxxxxx"
-                placeholderTextColor={subTextColor}
-                value={form.phone}
-                onChangeText={(v) => setForm({ ...form, phone: v })}
-              />
-            </View>
+            <AuthTextField
+              label={
+                <Text style={[styles.label, { color: subTextColor }]}>
+                  Phone number <Text style={{ color: 'red' }}>*</Text>
+                </Text>
+              }
+              keyboardType="phone-pad"
+              placeholder="09XXxxxxxxx"
+              value={draft.phone}
+              onChangeText={(v) => setDraft({ phone: v })}
+              onBlur={() => setTouched((prev) => ({ ...prev, phone: true }))}
+              error={phoneError}
+            />
 
             {/* Next */}
             <Pressable
               style={[styles.primaryButton, { opacity: isValid ? 1 : 0.5 }]}
               disabled={!isValid}
-              onPress={() =>
-                router.push({
-                  pathname: ROUTES.AUTH.CREATE_ACCOUNT.PASSWORD,
-                  params: form,
-                })
-              }
+              onPress={() => {
+                setAttempted(true);
+                if (!isValid) return;
+                router.push(ROUTES.AUTH.CREATE_ACCOUNT.PASSWORD);
+              }}
             >
               <Text style={styles.primaryButtonText}>Next</Text>
             </Pressable>
             <Pressable
               style={styles.secondaryButton}
               onPress={() => {
-                setForm({
-                  firstName: '',
-                  lastName: '',
-                  email: '',
-                  phone: '',
-                });
-                setEmailAvailable(null);
+                resetDraft();
                 setEmailError(null);
                 router.back();
               }}
@@ -262,22 +248,10 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
 
-  field: {
-    marginBottom: 18,
-  },
-
   label: {
     fontSize: 13,
     marginBottom: 6,
     fontWeight: '500',
-  },
-
-  input: {
-    height: 48,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    fontSize: 16,
   },
 
   primaryButton: {
@@ -307,20 +281,5 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.9,
-  },
-
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 48,
-  },
-
-  inputInner: {
-    flex: 1,
-    fontSize: 16,
-    paddingLeft: 8,
   },
 });

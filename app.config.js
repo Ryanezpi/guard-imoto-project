@@ -14,7 +14,7 @@ const writeEnvToFile = (envVar, fileName) => {
     fs.writeFileSync(fileName, content);
     return `./${fileName}`;
   } catch (error) {
-    console.error(`Error writing ${fileName}:`, error);
+    console.log(`Error writing ${fileName}:`, error);
     return null;
   }
 };
@@ -29,14 +29,6 @@ export default ({ config }) => {
           'EXPO_PRIVATE_GOOGLE_SERVICES_JSON',
           'google-services.json'
         ) || './google-services.json',
-    },
-    ios: {
-      ...config.ios,
-      googleServicesFile:
-        writeEnvToFile(
-          'EXPO_PRIVATE_GOOGLE_SERVICES_PLIST',
-          'GoogleService-Info.plist'
-        ) || './GoogleService-Info.plist',
     },
   };
 };

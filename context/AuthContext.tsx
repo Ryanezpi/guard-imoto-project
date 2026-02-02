@@ -8,12 +8,15 @@ import {
 } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import {
+  getIdToken,
+  onAuthStateChanged,
+  signOut,
+  type FirebaseAuthTypes,
+} from '@react-native-firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getMeAPI, updateProfile } from '@/services/user.service';
 import { useLoader } from './LoaderContext';
-import { ROUTES } from '@/constants/routes';
-import { router } from 'expo-router';
 
 type Status =
   | 'checking'
@@ -116,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(
       auth,
-      async (fbUser: FirebaseUser | null) => {
+      async (fbUser: FirebaseAuthTypes.User | null) => {
         if (!fbUser) {
           await SecureStore.deleteItemAsync(TOKEN_KEY);
           setUser(null);
@@ -126,15 +129,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         console.log('fbUser.emailVerified', fbUser.emailVerified);
-        const me = await getMeAPI(fbUser ? await fbUser.getIdToken() : '');
 
         if (!fbUser.emailVerified) {
           const token = await getFreshIdToken();
           await SecureStore.setItemAsync(TOKEN_KEY, token);
           setIdToken(token);
-          setUser(me);
+          setUser(null);
           setStatus('email-unverified');
-          router.replace(ROUTES.AUTH.CREATE_ACCOUNT.EMAIL_VERIFICATION);
           hideLoader();
           console.log('User email not verified:', fbUser.email);
           return; // Do NOT proceed to map
@@ -157,7 +158,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(me);
           setStatus('authenticated');
 
-          router.replace(ROUTES.APP.MAP);
           console.log('[Auth] User snapshot on init', {
             id: me.id,
             firebase_uid: me.firebase_uid,
@@ -187,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
     await SecureStore.deleteItemAsync(TOKEN_KEY);
-    await auth.signOut();
+    await signOut(auth);
 
     setUser(null);
     setIdToken(null);
@@ -220,7 +220,7 @@ export async function getFreshIdToken(): Promise<string> {
   const user = auth.currentUser;
   if (!user) throw new Error('No authenticated user');
 
-  return await user.getIdToken(true); // force refresh if needed
+  return await getIdToken(user, true);
 }
 
 async function getStoredExpoToken(): Promise<string | null> {

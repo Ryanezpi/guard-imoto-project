@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ROUTES } from '@/constants/routes';
 import * as Notifications from 'expo-notifications';
+import { CreateAccountProvider } from '@/context/CreateAccountContext';
 
 export default function AuthLayout() {
   const router = useRouter();
@@ -65,5 +66,9 @@ export default function AuthLayout() {
 
   if (!ready) return null;
 
-  return <Slot />;
+  return (
+    <CreateAccountProvider>
+      <Slot />
+    </CreateAccountProvider>
+  );
 }

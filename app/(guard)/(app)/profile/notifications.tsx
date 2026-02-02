@@ -1,17 +1,18 @@
 import DynamicCard from '@/components/ui/Card';
+import DateTimePill from '@/components/ui/DateTimePill';
 import DeviceDetailsModal from '@/components/ui/DeviceDetailsModal';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DynamicListItem } from '@/components/ui/DynamicList';
+import HelperBox from '@/components/ui/HelperBoxProps';
 import { useAuth } from '@/context/AuthContext';
 import { useLoader } from '@/context/LoaderContext';
 import { useTheme } from '@/context/ThemeContext';
-import DateTimePill from '@/components/ui/DateTimePill';
-import HelperBox from '@/components/ui/HelperBoxProps';
 import {
   getByDeviceId,
   getMyAlerts,
   resolveAlert,
 } from '@/services/user.service';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useGlobalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,7 +22,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useGlobalSearchParams } from 'expo-router';
 
 type AlertItem = {
   alert_id: string;
@@ -63,7 +63,7 @@ export default function NotificationsScreen() {
         const res = await getByDeviceId(idToken!, alert.device_id);
         setSelectedDevice(res.device);
       } catch (e) {
-        console.error('[DEVICE DETAILS]', e);
+        console.log('[DEVICE DETAILS]', e);
         setDetailsVisible(false);
       } finally {
         setDeviceLoading(false);
@@ -86,7 +86,7 @@ export default function NotificationsScreen() {
         prev ? { ...prev, resolved: true } : prev
       );
     } catch (e) {
-      console.error('[RESOLVE ALERT]', e);
+      console.log('[RESOLVE ALERT]', e);
     } finally {
       setResolving(false);
     }
@@ -97,7 +97,7 @@ export default function NotificationsScreen() {
       const res = await getMyAlerts(idToken!);
       setAlerts((res.alerts || []) as AlertItem[]);
     } catch (e) {
-      console.error('[ALERTS]', e);
+      console.log('[ALERTS]', e);
     }
   }, [idToken]);
 

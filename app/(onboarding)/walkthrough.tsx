@@ -1,4 +1,5 @@
-import React from 'react';
+import PrivacyPolicyModal from '@/components/ui/PrivacyPolicyModal';
+import React, { useState } from 'react';
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ROUTES } from '@/constants/routes';
@@ -6,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Walkthrough() {
   const router = useRouter();
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -37,7 +39,7 @@ export default function Walkthrough() {
           By proceeding further, you agree to our
           <Text
             style={styles.link}
-            onPress={() => router.push(ROUTES.ONBOARDING.PRIVACY_POLICY)}
+            onPress={() => setShowPrivacy(true)}
           >
             {' '}
             privacy policy{' '}
@@ -45,6 +47,10 @@ export default function Walkthrough() {
           and provide your consent.
         </Text>
       </View>
+      <PrivacyPolicyModal
+        visible={showPrivacy}
+        onClose={() => setShowPrivacy(false)}
+      />
     </SafeAreaView>
   );
 }

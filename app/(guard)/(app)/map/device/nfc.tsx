@@ -1,32 +1,32 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  ScrollView,
-  ActivityIndicator,
-  Pressable,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePill from '@/components/ui/DateTimePill';
-import { useTheme } from '@/context/ThemeContext';
+import ConfirmModal, {
+  type AlertAction,
+} from '@/components/ui/forms/ConfirmModal';
 import HelperBox from '@/components/ui/HelperBoxProps';
-import { useGlobalSearchParams } from 'expo-router';
+import TitleSection from '@/components/ui/TitleSection';
 import { useAuth } from '@/context/AuthContext';
+import { useLoader } from '@/context/LoaderContext';
+import { useTheme } from '@/context/ThemeContext';
 import {
   getDeviceNFCs,
   linkNFC,
   unlinkNFC,
   type NFCItem,
 } from '@/services/user.service';
-import { useLoader } from '@/context/LoaderContext';
-import ConfirmModal, {
-  type AlertAction,
-} from '@/components/ui/forms/ConfirmModal';
-import TitleSection from '@/components/ui/TitleSection';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useGlobalSearchParams } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function DeviceNFCCardScreen() {
   const { theme } = useTheme();
@@ -82,7 +82,7 @@ export default function DeviceNFCCardScreen() {
       const res = await getDeviceNFCs(idToken!, deviceId);
       setNfcs(res ?? []);
     } catch (e: any) {
-      console.error('Failed to fetch NFCs', e);
+      console.log('Failed to fetch NFCs', e);
       openAlert('Error', `Failed to fetch NFCs: ${e.message || e}`);
       setNfcs([]);
     } finally {
@@ -103,7 +103,7 @@ export default function DeviceNFCCardScreen() {
       await fetchNFCs();
       setManualInput('');
     } catch (e: any) {
-      console.error('Failed to link NFC', e);
+      console.log('Failed to link NFC', e);
       openAlert('Error', `Failed to link NFC: ${e.message || e}`);
     } finally {
       setLinking(false);
@@ -120,7 +120,7 @@ export default function DeviceNFCCardScreen() {
       // optimistic UI update
       setNfcs((prev) => prev.filter((n) => n.tag_uid !== tagUid));
     } catch (e: any) {
-      console.error('Failed to unlink NFC', e);
+      console.log('Failed to unlink NFC', e);
       openAlert('Error', `Failed to unlink NFC: ${e.message || e}`);
     } finally {
       setUnlinking(false);

@@ -1,9 +1,10 @@
+import AuthTextField from '@/components/ui/forms/AuthTextField';
 import { useLoader } from '@/context/LoaderContext';
 import { useTheme } from '@/context/ThemeContext';
 import { auth } from '@/lib/firebase';
 import { checkEmailAvailability } from '@/services/auth.service';
+import { sendPasswordResetEmail } from '@react-native-firebase/auth';
 import { useRouter } from 'expo-router';
-import { sendPasswordResetEmail } from 'firebase/auth';
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -11,7 +12,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -72,7 +72,7 @@ export default function ForgotPassword() {
       );
       setSent(true);
     } catch (err: any) {
-      console.error('Failed to send reset email:', err);
+      console.log('Failed to send reset email:', err);
       hideLoader();
       setErrorMessage(err.message || 'Failed to send reset email. Try again.');
     } finally {
@@ -96,10 +96,13 @@ export default function ForgotPassword() {
           </Text>
 
           {!sent && (
-            <TextInput
-              style={[styles.input, { borderColor, color: textColor }]}
+            <AuthTextField
+              label={
+                <Text style={[styles.label, { color: subTextColor }]}>
+                  Email address
+                </Text>
+              }
               placeholder="Email address"
-              placeholderTextColor={subTextColor}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -186,13 +189,10 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
 
-  input: {
-    height: 48,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    fontSize: 16,
-    marginBottom: 16,
+  label: {
+    fontSize: 13,
+    marginBottom: 6,
+    fontWeight: '500',
   },
 
   primaryButton: {

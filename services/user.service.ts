@@ -1,4 +1,9 @@
-import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
+import { getApp } from '@react-native-firebase/app';
+import {
+  getStorage,
+  getDownloadURL,
+  ref,
+} from '@react-native-firebase/storage';
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
 
 export interface AuditLog {
@@ -75,13 +80,9 @@ export async function uploadAvatar(
   uid: string,
   fileUri: string
 ): Promise<string> {
-  const storage = getStorage();
-  const response = await fetch(fileUri);
-  const blob = await response.blob();
-
+  const storage = getStorage(getApp());
   const avatarRef = ref(storage, `users/${uid}/avatar.jpg`);
-  await uploadBytes(avatarRef, blob);
-
+  await avatarRef.putFile(fileUri);
   return await getDownloadURL(avatarRef);
 }
 
@@ -109,13 +110,17 @@ export async function updateProfile(
     notifications_enabled?: boolean;
   }
 ) {
+  const body = Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== undefined)
+  );
+
   const res = await fetch(`${API_BASE}/users/me`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
   console.log(res);
 
@@ -171,11 +176,11 @@ export async function createDevice(idToken: string, body: CreateDeviceBody) {
   try {
     responseBody = await response.json(); // parse JSON even if error
   } catch (err) {
-    console.error('Failed to parse response JSON', err);
+    console.log('Failed to parse response JSON', err);
   }
 
   if (!response.ok) {
-    console.error('Create Device Error:', response.status, responseBody);
+    console.log('Create Device Error:', response.status, responseBody);
     throw new Error(
       responseBody?.message || `Failed to create device (${response.status})`
     );
@@ -207,7 +212,7 @@ export async function pairDevice(idToken: string, body: PairDeviceBody) {
   try {
     responseBody = await response.json();
   } catch (err) {
-    console.error('Failed to parse response JSON', err);
+    console.log('Failed to parse response JSON', err);
   }
 
   if (response.status === 404) {
@@ -216,7 +221,7 @@ export async function pairDevice(idToken: string, body: PairDeviceBody) {
   }
 
   if (!response.ok) {
-    console.error('Pair Device Error:', response.status, responseBody);
+    console.log('Pair Device Error:', response.status, responseBody);
     throw new Error(
       responseBody?.message || `Failed to pair device (${response.status})`
     );
@@ -288,7 +293,7 @@ export async function getDeviceNFCs(
       paired_at: tag.paired_at,
     }));
   } catch (e) {
-    console.error('Failed to fetch device NFCs', e);
+    console.log('Failed to fetch device NFCs', e);
     return []; // fallback to empty array
   }
 }
@@ -392,7 +397,7 @@ export async function triggerDeviceScanMode(
       throw new Error(err || 'Failed to trigger scan mode');
     }
   } catch (e) {
-    console.error('Failed to trigger device scan mode', e);
+    console.log('Failed to trigger device scan mode', e);
     throw e;
   }
 }

@@ -1,22 +1,22 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '@/context/ThemeContext';
-import TitleSection from '@/components/ui/TitleSection';
-import SegmentToggle from '@/components/ui/SegmentToggle';
+import ConfirmModal, {
+  type AlertAction,
+} from '@/components/ui/forms/ConfirmModal';
 import HelperBox from '@/components/ui/HelperBoxProps';
-import Slider from '@react-native-community/slider';
+import SegmentToggle from '@/components/ui/SegmentToggle';
+import TitleSection from '@/components/ui/TitleSection';
 import { useAuth } from '@/context/AuthContext';
-import { useGlobalSearchParams } from 'expo-router';
+import { useDevices } from '@/context/DeviceContext';
+import { useLoader } from '@/context/LoaderContext';
+import { useTheme } from '@/context/ThemeContext';
 import {
   patchDeviceAlarm,
   type AlarmConfigBody,
 } from '@/services/user.service';
-import { useDevices } from '@/context/DeviceContext';
-import { useLoader } from '@/context/LoaderContext';
-import ConfirmModal, {
-  type AlertAction,
-} from '@/components/ui/forms/ConfirmModal';
+import Slider from '@react-native-community/slider';
+import { useGlobalSearchParams } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function AlarmTypeScreen() {
   const { theme } = useTheme();
@@ -92,7 +92,7 @@ export default function AlarmTypeScreen() {
         console.log('✅ Patch successful, refreshing devices…', deviceId);
         await refreshDevices(); // <--- ensure global state is up-to-date
       } catch (e: any) {
-        console.error('❌ Patch error:', e);
+        console.log('❌ Patch error:', e);
         openAlert(
           'Error',
           e.message || 'Failed to update alarm configuration.'

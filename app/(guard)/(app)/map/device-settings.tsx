@@ -1,10 +1,11 @@
 import DynamicCard from '@/components/ui/Card';
 import { DeviceCard } from '@/components/ui/DeviceCard';
+import AuthTextField from '@/components/ui/forms/AuthTextField';
 import ConfirmModal, {
   type AlertAction,
 } from '@/components/ui/forms/ConfirmModal';
-import TitleSection from '@/components/ui/TitleSection';
 import HelperBox from '@/components/ui/HelperBoxProps';
+import TitleSection from '@/components/ui/TitleSection';
 import { DEVICE_COLORS } from '@/constants/colors';
 import { ROUTES } from '@/constants/routes';
 import { useAuth } from '@/context/AuthContext';
@@ -12,33 +13,32 @@ import { useDevices } from '@/context/DeviceContext';
 import { useLoader } from '@/context/LoaderContext';
 import { useTheme } from '@/context/ThemeContext';
 import {
-  getDeviceTelemetrySummary,
+  createVehicle,
+  deleteVehicle,
   getDeviceNFCs,
+  getDeviceTelemetrySummary,
   getMyAlerts,
   getVehicle,
-  createVehicle,
-  updateVehicle,
-  deleteVehicle,
-  type Vehicle,
-  type VehicleType,
-  type UpsertVehicleBody,
   patchDeviceConfig,
   unlinkDevice,
+  updateVehicle,
+  type UpsertVehicleBody,
+  type Vehicle,
+  type VehicleType,
 } from '@/services/user.service';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { router, useGlobalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
+  Pressable,
+  RefreshControl,
   ScrollView,
+  Text,
   TextInput,
   TouchableOpacity,
-  Pressable,
   View,
-  Text,
-  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import AuthTextField from '@/components/ui/forms/AuthTextField';
 
 import { TelemetryModal } from '@/components/ui/TelemetryModal';
 
@@ -273,7 +273,7 @@ export default function DeviceSettingsScreen() {
       const res = await getDeviceTelemetrySummary(idToken!, deviceId!);
       setTelemetry(res || []);
     } catch (e) {
-      console.error('[TELEMETRY]', e);
+      console.log('[TELEMETRY]', e);
     }
   }, [deviceId, idToken]);
 
@@ -287,7 +287,7 @@ export default function DeviceSettingsScreen() {
         ) ?? [];
       setUnresolvedCount(unresolved.length);
     } catch (e) {
-      console.error('[ALERTS]', e);
+      console.log('[ALERTS]', e);
     }
   }, [deviceId, idToken]);
 
@@ -298,7 +298,7 @@ export default function DeviceSettingsScreen() {
       const res = await getDeviceNFCs(idToken, deviceId);
       setNfcCount(res?.length ?? 0);
     } catch (e) {
-      console.error('[NFC]', e);
+      console.log('[NFC]', e);
       setNfcCount(undefined);
     } finally {
       setNfcLoading(false);
@@ -328,7 +328,7 @@ export default function DeviceSettingsScreen() {
       // Treat "empty" vehicles (all-null metadata) as unbound.
       setVehicle(isVehicleEmpty(res) ? null : (res as Vehicle));
     } catch (e) {
-      console.error('[VEHICLE]', e);
+      console.log('[VEHICLE]', e);
       setVehicle(null);
     } finally {
       setVehicleLoading(false);
@@ -509,7 +509,7 @@ export default function DeviceSettingsScreen() {
         console.log('Interval device data Refreshed');
         // update device state here
       } catch (err) {
-        console.error('Failed to fetch interval data', err);
+        console.log('Failed to fetch interval data', err);
       }
     }, intervalSec * 2000);
 

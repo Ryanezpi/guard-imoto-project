@@ -75,7 +75,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
 
       if (!res.ok) {
         const errText = await res.text();
-        console.error('[DeviceContext] Fetch failed:', errText);
+        console.log('[DeviceContext] Fetch failed:', errText);
         throw new Error(errText || 'Failed to fetch devices');
       }
 
@@ -87,7 +87,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
 
       setDevices(data.devices || []);
     } catch (err: any) {
-      console.error('[DeviceContext] Device fetch error:', err);
+      console.log('[DeviceContext] Device fetch error:', err);
       setError(err.message || 'Failed to fetch devices');
       setDevices([]);
     } finally {

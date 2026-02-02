@@ -1,13 +1,13 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import React, {
   createContext,
+  ReactNode,
   useContext,
   useEffect,
   useState,
-  ReactNode,
 } from 'react';
 import { StatusBar } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Type for theme
 type Theme = 'light' | 'dark';
@@ -40,7 +40,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
           setThemeState(saved);
         }
       } catch (e) {
-        console.error('Failed to load theme', e);
+        console.log('Failed to load theme', e);
       }
     };
     loadTheme();
@@ -52,7 +52,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       await AsyncStorage.setItem('@theme', newTheme);
       setThemeState(newTheme);
     } catch (e) {
-      console.error('Failed to save theme', e);
+      console.log('Failed to save theme', e);
     }
   };
 
