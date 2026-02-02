@@ -43,6 +43,8 @@ export default function MapDashboard() {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [overlayMinimized, setOverlayMinimized] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const [mapLoadTimedOut, setMapLoadTimedOut] = useState(false);
   const overlayAnim = useRef(new Animated.Value(0)).current;
 
   /* ------------------ Focus device from navigation ------------------ */
@@ -198,6 +200,18 @@ export default function MapDashboard() {
     setRegion(fallbackRegion);
   }, [contextDevices, region, userLocation]);
 
+  useEffect(() => {
+    if (!region) return;
+    setMapReady(false);
+    setMapLoadTimedOut(false);
+
+    const timer = setTimeout(() => {
+      setMapLoadTimedOut(true);
+    }, 6000);
+
+    return () => clearTimeout(timer);
+  }, [region]);
+
   /* ------------------ Handlers (memoized) ------------------ */
   const goToHome = useCallback(() => {
     setOverlayMinimized(false);
@@ -285,6 +299,7 @@ export default function MapDashboard() {
           pitchEnabled={false}
           customMapStyle={mapStyle}
           onPress={handleMapPress}
+          onMapReady={() => setMapReady(true)}
           onPanDrag={() => {
             if (!overlayMinimized) setOverlayMinimized(true);
           }}
@@ -294,6 +309,13 @@ export default function MapDashboard() {
       ) : (
         <View style={styles.loader}>
           <ActivityIndicator size="large" color="#9F0EA1" />
+        </View>
+      )}
+
+      {!mapReady && mapLoadTimedOut && (
+        <View style={styles.mapErrorOverlay} pointerEvents="none">
+          <ActivityIndicator size="small" color="#9F0EA1" />
+          <Text style={styles.mapErrorText}>Map didn&apos;t load</Text>
         </View>
       )}
 
@@ -444,5 +466,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  mapErrorOverlay: {
+    position: 'absolute',
+    top: 16,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  mapErrorText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
   },
 });

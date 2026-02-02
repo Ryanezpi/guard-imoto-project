@@ -24,6 +24,12 @@ export default ({ config }) => {
     ...config,
     android: {
       ...config.android,
+      config: {
+        ...(config.android?.config ?? {}),
+        googleMaps: {
+          apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+        },
+      },
       googleServicesFile:
         writeEnvToFile(
           'EXPO_PRIVATE_GOOGLE_SERVICES_JSON',
