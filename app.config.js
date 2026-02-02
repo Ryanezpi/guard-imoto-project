@@ -1,16 +1,45 @@
+import { Buffer } from 'buffer';
 import 'dotenv/config';
-import { writeFileSync } from 'fs';
-import { resolve, dirname } from 'path';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { resolve } from 'path';
 
 const writeEnvToFile = (envVar, fileName) => {
-  const content = process.env.hasOwnProperty(envVar)
+  const rawValue = process.env.hasOwnProperty(envVar)
     ? process.env[envVar]
     : undefined;
-  if (!content) return null;
+  if (!rawValue) return null;
 
   try {
-    const targetPath = resolve(dirname(require.main.filename), fileName);
-    writeFileSync(targetPath, content);
+    let content = rawValue;
+    if (content.startsWith('base64:')) {
+      content = Buffer.from(content.slice('base64:'.length), 'base64').toString(
+        'utf8'
+      );
+    } else if (
+      (content.startsWith('"') && content.endsWith('"')) ||
+      (content.startsWith("'") && content.endsWith("'"))
+    ) {
+      // Unwrap quoted JSON string without converting \\n to newlines.
+      content = content.slice(1, -1);
+      content = content.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+    }
+
+    const baseDir = process.cwd();
+    const targetPath = resolve(baseDir, fileName);
+
+    const envPath = content.startsWith('/')
+      ? content
+      : content.startsWith('./') || content.startsWith('../')
+        ? resolve(baseDir, content)
+        : null;
+
+    if (envPath && existsSync(envPath)) {
+      const fileContent = readFileSync(envPath, 'utf8');
+      writeFileSync(targetPath, fileContent);
+    } else {
+      writeFileSync(targetPath, content);
+    }
+
     return `./${fileName}`;
   } catch (error) {
     console.error(`Error writing ${fileName}:`, error);
