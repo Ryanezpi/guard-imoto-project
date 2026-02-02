@@ -5,7 +5,9 @@
     "source.sortMembers": "explicit"
   },
   "cSpell.words": [
+    "ADMINSDK",
     "Cooldown",
+    "fbsvc",
     "firebaseapp",
     "firebasestorage",
     "gearshape",
